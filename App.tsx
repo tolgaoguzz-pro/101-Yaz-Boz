@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 
+import { usePersistedActiveGame } from './src/app/usePersistedActiveGame';
 import { CalculateRoundResult } from './src/engine/calculateRound';
+import {
+  createRematchGame,
+  isGameComplete,
+} from './src/ui/gameResult';
+import { PLAYER_IDS, TEAM_IDS } from './src/ui/gameRoster';
 import {
   ActiveGameData,
   ActiveGamePlayer,
@@ -10,6 +16,8 @@ import {
   LastGameAction,
   SavedRoundSummary,
 } from './src/ui/screens/ActiveGameScreen';
+import { AppLoadingScreen } from './src/ui/screens/AppLoadingScreen';
+import { GameResultScreen } from './src/ui/screens/GameResultScreen';
 import { HomeScreen } from './src/ui/screens/HomeScreen';
 import { NewGameScreen } from './src/ui/screens/NewGameScreen';
 import {
@@ -17,17 +25,14 @@ import {
   QuickPenaltySelection,
 } from './src/ui/screens/QuickPenaltyScreen';
 import { RoundEntryScreen } from './src/ui/screens/RoundEntryScreen';
-import { PLAYER_IDS, TEAM_IDS } from './src/ui/gameRoster';
 
 type Screen =
   | 'home'
   | 'newGame'
   | 'activeGame'
   | 'roundEntry'
-  | 'quickPenalty';
-
-/** Geçici aktif oyun state’i (UI katmanı; henüz kalıcı değil). */
-type TemporaryActiveGame = ActiveGameData;
+  | 'quickPenalty'
+  | 'gameResult';
 
 function scoreById(
   entries: { playerId?: string; teamId?: string; score: number }[],
@@ -53,9 +58,9 @@ function withUpdatedPlayerScore(
 }
 
 function applyPenaltyToGame(
-  game: TemporaryActiveGame,
+  game: ActiveGameData,
   selection: QuickPenaltySelection,
-): TemporaryActiveGame {
+): ActiveGameData {
   const lastAction: LastGameAction = {
     playerName: selection.playerName,
     penaltyLabel: selection.label,
@@ -88,9 +93,9 @@ function applyPenaltyToGame(
 }
 
 function applyRoundResultToGame(
-  game: TemporaryActiveGame,
+  game: ActiveGameData,
   result: CalculateRoundResult,
-): TemporaryActiveGame {
+): ActiveGameData {
   const playerScores = result.players.map((player) => ({
     playerId: player.playerId,
     score: player.score,
@@ -114,6 +119,7 @@ function applyRoundResultToGame(
   const team2 = game.teams[1];
 
   return {
+    ...game,
     roundNumber: game.roundNumber + 1,
     rounds: [...game.rounds, savedRound],
     lastAction: null,
@@ -168,12 +174,25 @@ function applyRoundResultToGame(
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
-  const [activeGame, setActiveGame] = useState<TemporaryActiveGame | null>(
-    null,
-  );
+  const {
+    ready,
+    activeGame,
+    continuableGame,
+    commitActiveGame,
+    updateActiveGame,
+  } = usePersistedActiveGame();
 
-  function handleStartGame(game: TemporaryActiveGame) {
-    setActiveGame(game);
+  if (!ready) {
+    return (
+      <>
+        <AppLoadingScreen />
+        <StatusBar style="dark" />
+      </>
+    );
+  }
+
+  function handleStartGame(game: ActiveGameData) {
+    commitActiveGame(game);
     setScreen('activeGame');
   }
 
@@ -182,32 +201,42 @@ export default function App() {
   }
 
   function handleSaveRound(result: CalculateRoundResult) {
-    setActiveGame((current) => {
-      if (!current) {
-        return current;
-      }
-      return applyRoundResultToGame(current, result);
-    });
-    setScreen('activeGame');
+    if (!activeGame) {
+      return;
+    }
+
+    const nextGame = applyRoundResultToGame(activeGame, result);
+    commitActiveGame(nextGame);
+    setScreen(isGameComplete(nextGame) ? 'gameResult' : 'activeGame');
   }
 
   function handleApplyPenalty(selection: QuickPenaltySelection) {
-    setActiveGame((current) => {
-      if (!current) {
-        return current;
-      }
-      return applyPenaltyToGame(current, selection);
-    });
+    updateActiveGame((current) => applyPenaltyToGame(current, selection));
     setScreen('activeGame');
+  }
+
+  function handleRematch() {
+    updateActiveGame((current) => createRematchGame(current));
+    setScreen('activeGame');
+  }
+
+  function handleNewTeams() {
+    commitActiveGame(null);
+    setScreen('newGame');
+  }
+
+  function handleNewGameFromHome() {
+    commitActiveGame(null);
+    setScreen('newGame');
   }
 
   return (
     <>
       {screen === 'home' ? (
         <HomeScreen
-          activeGame={activeGame}
+          activeGame={continuableGame}
           onContinue={() => setScreen('activeGame')}
-          onNewGame={() => setScreen('newGame')}
+          onNewGame={handleNewGameFromHome}
         />
       ) : null}
       {screen === 'newGame' ? (
@@ -216,26 +245,33 @@ export default function App() {
           onStart={handleStartGame}
         />
       ) : null}
-      {screen === 'activeGame' && activeGame ? (
+      {screen === 'activeGame' && continuableGame ? (
         <ActiveGameScreen
-          game={activeGame}
+          game={continuableGame}
           onHome={handleHome}
           onNewRound={() => setScreen('roundEntry')}
           onAddPenalty={() => setScreen('quickPenalty')}
         />
       ) : null}
-      {screen === 'roundEntry' && activeGame ? (
+      {screen === 'roundEntry' && continuableGame ? (
         <RoundEntryScreen
-          game={activeGame}
+          game={continuableGame}
           onBack={() => setScreen('activeGame')}
           onSaveRound={handleSaveRound}
         />
       ) : null}
-      {screen === 'quickPenalty' && activeGame ? (
+      {screen === 'quickPenalty' && continuableGame ? (
         <QuickPenaltyScreen
-          game={activeGame}
+          game={continuableGame}
           onBack={() => setScreen('activeGame')}
           onApply={handleApplyPenalty}
+        />
+      ) : null}
+      {screen === 'gameResult' && activeGame ? (
+        <GameResultScreen
+          game={activeGame}
+          onRematch={handleRematch}
+          onNewTeams={handleNewTeams}
         />
       ) : null}
       <StatusBar style="dark" />

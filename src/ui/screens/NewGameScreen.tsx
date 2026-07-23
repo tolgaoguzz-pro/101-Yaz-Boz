@@ -13,6 +13,12 @@ import {
 import { AppTextField } from '../components/AppTextField';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { PLAYER_IDS } from '../gameRoster';
+import {
+  DEFAULT_TARGET_ROUND_COUNT,
+  isTargetRoundCountOption,
+  TARGET_ROUND_COUNT_OPTIONS,
+  TargetRoundCountOption,
+} from '../targetRoundCount';
 import { colors, radii, spacing, typography } from '../theme';
 import { ActiveGameData } from './ActiveGameScreen';
 
@@ -39,12 +45,38 @@ const INITIAL_FORM: GameSetupForm = {
   player4Name: 'Oyuncu 4',
 };
 
+type RoundCountChipProps = {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+};
+
+function RoundCountChip({ label, selected, onPress }: RoundCountChipProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.chip,
+        selected && styles.chipSelected,
+        pressed && styles.chipPressed,
+      ]}
+    >
+      <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 function isBlank(value: string): boolean {
   return value.trim().length === 0;
 }
 
 export function NewGameScreen({ onBack, onStart }: NewGameScreenProps) {
   const [form, setForm] = useState<GameSetupForm>(INITIAL_FORM);
+  const [targetRoundCount, setTargetRoundCount] =
+    useState<TargetRoundCountOption>(DEFAULT_TARGET_ROUND_COUNT);
   const [error, setError] = useState<string | null>(null);
 
   function updateField<K extends keyof GameSetupForm>(
@@ -57,6 +89,13 @@ export function NewGameScreen({ onBack, onStart }: NewGameScreenProps) {
     }
   }
 
+  function handleSelectRoundCount(value: TargetRoundCountOption) {
+    setTargetRoundCount(value);
+    if (error) {
+      setError(null);
+    }
+  }
+
   function handleStart() {
     const values = Object.values(form);
     if (values.some(isBlank)) {
@@ -64,10 +103,16 @@ export function NewGameScreen({ onBack, onStart }: NewGameScreenProps) {
       return;
     }
 
+    if (!isTargetRoundCountOption(targetRoundCount)) {
+      setError('Kaç el oynanacağını seçmelisin (8, 10, 12 veya 16).');
+      return;
+    }
+
     const game: ActiveGameData = {
       roundNumber: 1,
       rounds: [],
       lastAction: null,
+      targetRoundCount,
       teams: [
         {
           name: form.team1Name.trim(),
@@ -175,6 +220,23 @@ export function NewGameScreen({ onBack, onStart }: NewGameScreenProps) {
             />
           </View>
 
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Kaç el oynanacak?</Text>
+            <Text style={styles.cardHint}>
+              Toplam el sayısını seç. Varsayılan 12 el.
+            </Text>
+            <View style={styles.chipRow}>
+              {TARGET_ROUND_COUNT_OPTIONS.map((option) => (
+                <RoundCountChip
+                  key={option}
+                  label={`${option} El`}
+                  selected={targetRoundCount === option}
+                  onPress={() => handleSelectRoundCount(option)}
+                />
+              ))}
+            </View>
+          </View>
+
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <PrimaryButton label="Oyunu Başlat" onPress={handleStart} />
@@ -242,6 +304,39 @@ const styles = StyleSheet.create({
   cardTitle: {
     ...typography.buttonSecondary,
     color: colors.primary,
+  },
+  cardHint: {
+    ...typography.infoLabel,
+    color: colors.textSecondary,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  chip: {
+    minHeight: 40,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceElevated,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chipSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  chipPressed: {
+    opacity: 0.88,
+  },
+  chipLabel: {
+    ...typography.buttonSecondary,
+    color: colors.text,
+  },
+  chipLabelSelected: {
+    color: colors.textOnPrimary,
   },
   error: {
     ...typography.body,

@@ -1,12 +1,22 @@
-import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { HomeInfoCard } from '../components/HomeInfoCard';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SecondaryButton } from '../components/SecondaryButton';
+import { resolveTargetRoundCount } from '../targetRoundCount';
 import { colors, radii, spacing, typography } from '../theme';
 import { ActiveGameData } from './ActiveGameScreen';
 
 type HomeScreenProps = {
+  /** Yalnızca devam edilebilir (tamamlanmamış) oyun. */
   activeGame: ActiveGameData | null;
   onContinue: () => void;
   onNewGame: () => void;
@@ -41,6 +51,11 @@ export function HomeScreen({
     );
   }
 
+  const targetRounds = activeGame
+    ? resolveTargetRoundCount(activeGame.targetRoundCount)
+    : 0;
+  const playedRounds = activeGame?.rounds.length ?? 0;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -57,13 +72,25 @@ export function HomeScreen({
         </View>
 
         {activeGame ? (
-          <View style={styles.activeCard}>
-            <Text style={styles.activeLabel}>Aktif oyun</Text>
-            <Text style={styles.activeScore}>
-              {activeGame.teams[0].name} {activeGame.teams[0].totalScore} —{' '}
+          <Pressable
+            accessibilityRole="button"
+            onPress={onContinue}
+            style={({ pressed }) => [
+              styles.activeCard,
+              pressed && styles.activeCardPressed,
+            ]}
+          >
+            <Text style={styles.activeLabel}>Devam Eden Oyun</Text>
+            <Text style={styles.activeMeta}>
+              Oynanan El: {playedRounds} / {targetRounds}
+            </Text>
+            <Text style={styles.activeScore} numberOfLines={1}>
+              {activeGame.teams[0].name} {activeGame.teams[0].totalScore}
+            </Text>
+            <Text style={styles.activeScore} numberOfLines={1}>
               {activeGame.teams[1].name} {activeGame.teams[1].totalScore}
             </Text>
-          </View>
+          </Pressable>
         ) : null}
 
         <View style={styles.actions}>
@@ -82,10 +109,6 @@ export function HomeScreen({
             />
           </View>
         </View>
-
-        <Text style={styles.warning}>
-          Test sürümü: Uygulama kapanırsa aktif oyun silinir.
-        </Text>
 
         <HomeInfoCard />
       </ScrollView>
@@ -129,11 +152,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.md,
-    gap: spacing.xs,
+    gap: 4,
+  },
+  activeCardPressed: {
+    backgroundColor: colors.surfaceElevated,
   },
   activeLabel: {
     ...typography.infoLabel,
     color: colors.primary,
+    marginBottom: 2,
+  },
+  activeMeta: {
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+    color: colors.textSecondary,
+    marginBottom: 4,
   },
   activeScore: {
     ...typography.buttonSecondary,
@@ -145,10 +179,5 @@ const styles = StyleSheet.create({
   secondaryRow: {
     flexDirection: 'row',
     gap: spacing.sm,
-  },
-  warning: {
-    ...typography.infoLabel,
-    color: colors.textSecondary,
-    textAlign: 'center',
   },
 });

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -177,6 +178,7 @@ export function RoundEntryScreen({
   }
 
   function handlePreview() {
+    Keyboard.dismiss();
     try {
       const roundInput = buildRoundInputFromForm(
         form,
@@ -200,6 +202,7 @@ export function RoundEntryScreen({
   }
 
   function handleSave() {
+    Keyboard.dismiss();
     if (!preview) {
       return;
     }
@@ -225,8 +228,14 @@ export function RoundEntryScreen({
           <ScrollView
             contentContainerStyle={styles.content}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             showsVerticalScrollIndicator={false}
           >
+            <Pressable
+              accessible={false}
+              onPress={Keyboard.dismiss}
+              style={styles.dismissArea}
+            >
             <View style={styles.topRow}>
               <Pressable
                 accessibilityRole="button"
@@ -340,6 +349,7 @@ export function RoundEntryScreen({
                           <TextInput
                             keyboardType="number-pad"
                             value={playerForm.remainingTilePointsText}
+                            selectTextOnFocus
                             onChangeText={(value) =>
                               updatePlayer(playerId, {
                                 remainingTilePointsText: value,
@@ -406,6 +416,7 @@ export function RoundEntryScreen({
                 ) : null}
               </View>
             ) : null}
+            </Pressable>
           </ScrollView>
 
           <View style={styles.footer}>
@@ -445,6 +456,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: spacing.xs,
     paddingBottom: spacing.sm,
+    gap: spacing.sm,
+  },
+  dismissArea: {
     gap: spacing.sm,
   },
   topRow: {
