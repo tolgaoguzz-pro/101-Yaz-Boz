@@ -39,6 +39,7 @@ import { ActiveGameData } from './ActiveGameScreen';
 type RoundEntryScreenProps = {
   game: ActiveGameData;
   onBack: () => void;
+  onSaveRound: (result: CalculateRoundResult) => void;
 };
 
 const OPEN_OPTIONS: { value: RoundEntryOpenType; label: string }[] = [
@@ -134,7 +135,11 @@ function Stepper({ label, value, onChange }: StepperProps) {
   );
 }
 
-export function RoundEntryScreen({ game, onBack }: RoundEntryScreenProps) {
+export function RoundEntryScreen({
+  game,
+  onBack,
+  onSaveRound,
+}: RoundEntryScreenProps) {
   const rosterPlayers = useMemo(() => playersFromActiveGame(game), [game]);
   const engineRoster = useMemo(() => buildRosterFromActiveGame(game), [game]);
 
@@ -216,7 +221,7 @@ export function RoundEntryScreen({ game, onBack }: RoundEntryScreenProps) {
     if (!preview) {
       return;
     }
-    console.log(preview);
+    onSaveRound(preview);
   }
 
   const nameByPlayerId = useMemo(() => {

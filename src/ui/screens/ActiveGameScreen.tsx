@@ -22,9 +22,18 @@ export type ActiveGameTeam = {
   players: [ActiveGamePlayer, ActiveGamePlayer];
 };
 
+export type SavedRoundSummary = {
+  roundNumber: number;
+  players: { playerId: string; score: number }[];
+  teams: { teamId: string; score: number }[];
+  finishTeamBonus: { teamId: string | null; amount: number };
+};
+
 export type ActiveGameData = {
   teams: [ActiveGameTeam, ActiveGameTeam];
+  /** Bir sonraki oynanacak el numarası (ekranda “El N”). */
   roundNumber: number;
+  rounds: SavedRoundSummary[];
 };
 
 type ActiveGameScreenProps = {
