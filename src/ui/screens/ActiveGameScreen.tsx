@@ -8,10 +8,12 @@ import {
   View,
 } from 'react-native';
 
+import { TEAM_IDS } from '../gameRoster';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { colors, radii, spacing, typography } from '../theme';
 
 export type ActiveGamePlayer = {
+  id: string;
   name: string;
   totalScore: number;
 };
@@ -31,7 +33,7 @@ export type SavedRoundSummary = {
 
 export type ActiveGameData = {
   teams: [ActiveGameTeam, ActiveGameTeam];
-  /** Bir sonraki oynanacak el numarası (ekranda “El N”). */
+  /** Bir sonraki oynanacak el numarası. */
   roundNumber: number;
   rounds: SavedRoundSummary[];
 };
@@ -50,14 +52,19 @@ function TeamCard({
   stacked: boolean;
 }) {
   return (
-    <View style={[styles.teamCard, stacked ? styles.teamCardStacked : styles.teamCardSide]}>
+    <View
+      style={[
+        styles.teamCard,
+        stacked ? styles.teamCardStacked : styles.teamCardSide,
+      ]}
+    >
       <Text style={styles.teamName} numberOfLines={1}>
         {team.name}
       </Text>
       <Text style={styles.teamScore}>{team.totalScore}</Text>
       <View style={styles.players}>
         {team.players.map((player) => (
-          <View key={player.name} style={styles.playerRow}>
+          <View key={player.id} style={styles.playerRow}>
             <Text style={styles.playerName} numberOfLines={1}>
               {player.name}
             </Text>
@@ -76,6 +83,14 @@ export function ActiveGameScreen({
 }: ActiveGameScreenProps) {
   const { width } = useWindowDimensions();
   const stacked = width < 380;
+  const playedRounds = game.rounds.length;
+  const lastRound =
+    playedRounds > 0 ? game.rounds[playedRounds - 1] : null;
+
+  const lastTeam1 =
+    lastRound?.teams.find((team) => team.teamId === TEAM_IDS.team1)?.score ?? 0;
+  const lastTeam2 =
+    lastRound?.teams.find((team) => team.teamId === TEAM_IDS.team2)?.score ?? 0;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -100,13 +115,31 @@ export function ActiveGameScreen({
 
           <View style={styles.header}>
             <Text style={styles.title}>Aktif Oyun</Text>
-            <Text style={styles.roundInfo}>El {game.roundNumber}</Text>
+            <Text style={styles.roundInfo}>Oynanan el: {playedRounds}</Text>
           </View>
 
           <View style={[styles.teamsRow, stacked && styles.teamsColumn]}>
             <TeamCard team={game.teams[0]} stacked={stacked} />
             <TeamCard team={game.teams[1]} stacked={stacked} />
           </View>
+
+          {lastRound ? (
+            <View style={styles.lastRoundCard}>
+              <Text style={styles.lastRoundTitle}>
+                Son el (El {lastRound.roundNumber})
+              </Text>
+              <Text style={styles.lastRoundLine}>
+                {game.teams[0].name}: {lastTeam1}
+              </Text>
+              <Text style={styles.lastRoundLine}>
+                {game.teams[1].name}: {lastTeam2}
+              </Text>
+            </View>
+          ) : null}
+
+          <Text style={styles.warning}>
+            Test sürümü: Uygulama kapanırsa aktif oyun silinir.
+          </Text>
         </ScrollView>
 
         <View style={styles.footer}>
@@ -224,6 +257,28 @@ const styles = StyleSheet.create({
   playerScore: {
     ...typography.buttonSecondary,
     color: colors.textSecondary,
+  },
+  lastRoundCard: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  lastRoundTitle: {
+    ...typography.buttonSecondary,
+    color: colors.primary,
+    marginBottom: spacing.xs,
+  },
+  lastRoundLine: {
+    ...typography.body,
+    color: colors.text,
+  },
+  warning: {
+    ...typography.infoLabel,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   footer: {
     paddingHorizontal: spacing.lg,

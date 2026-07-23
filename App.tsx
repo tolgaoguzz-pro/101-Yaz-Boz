@@ -63,12 +63,14 @@ function applyRoundResultToGame(
           scoreById(teamScores, TEAM_IDS.team1, 'teamId'),
         players: [
           {
+            id: team1.players[0].id,
             name: team1.players[0].name,
             totalScore:
               team1.players[0].totalScore +
               scoreById(playerScores, PLAYER_IDS.player1, 'playerId'),
           },
           {
+            id: team1.players[1].id,
             name: team1.players[1].name,
             totalScore:
               team1.players[1].totalScore +
@@ -83,12 +85,14 @@ function applyRoundResultToGame(
           scoreById(teamScores, TEAM_IDS.team2, 'teamId'),
         players: [
           {
+            id: team2.players[0].id,
             name: team2.players[0].name,
             totalScore:
               team2.players[0].totalScore +
               scoreById(playerScores, PLAYER_IDS.player3, 'playerId'),
           },
           {
+            id: team2.players[1].id,
             name: team2.players[1].name,
             totalScore:
               team2.players[1].totalScore +
@@ -128,7 +132,11 @@ export default function App() {
   return (
     <>
       {screen === 'home' ? (
-        <HomeScreen onNewGame={() => setScreen('newGame')} />
+        <HomeScreen
+          activeGame={activeGame}
+          onContinue={() => setScreen('activeGame')}
+          onNewGame={() => setScreen('newGame')}
+        />
       ) : null}
       {screen === 'newGame' ? (
         <NewGameScreen

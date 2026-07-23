@@ -411,6 +411,9 @@ export function RoundEntryScreen({
           {preview ? (
             <View style={styles.resultCard}>
               <Text style={styles.resultTitle}>El Sonucu</Text>
+              <Text style={styles.resultHint}>
+                Bitiren oyuncunun puanı 0 görünür; bu normaldir.
+              </Text>
 
               <Text style={styles.resultSectionLabel}>Oyuncular</Text>
               {preview.players.map((playerScore) => (
@@ -652,6 +655,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  resultHint: {
+    ...typography.infoLabel,
+    color: colors.textSecondary,
     marginBottom: spacing.xs,
   },
   resultSectionLabel: {

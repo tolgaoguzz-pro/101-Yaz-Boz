@@ -12,6 +12,7 @@ import {
 
 import { AppTextField } from '../components/AppTextField';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { PLAYER_IDS } from '../gameRoster';
 import { colors, radii, spacing, typography } from '../theme';
 import { ActiveGameData } from './ActiveGameScreen';
 
@@ -71,16 +72,32 @@ export function NewGameScreen({ onBack, onStart }: NewGameScreenProps) {
           name: form.team1Name.trim(),
           totalScore: 0,
           players: [
-            { name: form.player1Name.trim(), totalScore: 0 },
-            { name: form.player2Name.trim(), totalScore: 0 },
+            {
+              id: PLAYER_IDS.player1,
+              name: form.player1Name.trim(),
+              totalScore: 0,
+            },
+            {
+              id: PLAYER_IDS.player2,
+              name: form.player2Name.trim(),
+              totalScore: 0,
+            },
           ],
         },
         {
           name: form.team2Name.trim(),
           totalScore: 0,
           players: [
-            { name: form.player3Name.trim(), totalScore: 0 },
-            { name: form.player4Name.trim(), totalScore: 0 },
+            {
+              id: PLAYER_IDS.player3,
+              name: form.player3Name.trim(),
+              totalScore: 0,
+            },
+            {
+              id: PLAYER_IDS.player4,
+              name: form.player4Name.trim(),
+              totalScore: 0,
+            },
           ],
         },
       ],
