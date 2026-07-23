@@ -13,9 +13,11 @@ import {
 import { AppTextField } from '../components/AppTextField';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { colors, radii, spacing, typography } from '../theme';
+import { ActiveGameData } from './ActiveGameScreen';
 
 type NewGameScreenProps = {
   onBack: () => void;
+  onStart: (game: ActiveGameData) => void;
 };
 
 type GameSetupForm = {
@@ -40,7 +42,7 @@ function isBlank(value: string): boolean {
   return value.trim().length === 0;
 }
 
-export function NewGameScreen({ onBack }: NewGameScreenProps) {
+export function NewGameScreen({ onBack, onStart }: NewGameScreenProps) {
   const [form, setForm] = useState<GameSetupForm>(INITIAL_FORM);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,16 +63,29 @@ export function NewGameScreen({ onBack }: NewGameScreenProps) {
       return;
     }
 
-    console.log({
-      team1: {
-        name: form.team1Name.trim(),
-        players: [form.player1Name.trim(), form.player2Name.trim()],
-      },
-      team2: {
-        name: form.team2Name.trim(),
-        players: [form.player3Name.trim(), form.player4Name.trim()],
-      },
-    });
+    const game: ActiveGameData = {
+      roundNumber: 1,
+      teams: [
+        {
+          name: form.team1Name.trim(),
+          totalScore: 0,
+          players: [
+            { name: form.player1Name.trim(), totalScore: 0 },
+            { name: form.player2Name.trim(), totalScore: 0 },
+          ],
+        },
+        {
+          name: form.team2Name.trim(),
+          totalScore: 0,
+          players: [
+            { name: form.player3Name.trim(), totalScore: 0 },
+            { name: form.player4Name.trim(), totalScore: 0 },
+          ],
+        },
+      ],
+    };
+
+    onStart(game);
   }
 
   return (
