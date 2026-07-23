@@ -16,13 +16,11 @@ import {
   teamNameFromActiveGame,
 } from '../gameRoster';
 import { playerIdFromIndividualTeamId } from '../individualRound';
+import { RoundPreviewMeta } from '../roundEntry/previewState';
 import { colors, radii, spacing, typography } from '../theme';
 import { ActiveGameData } from './ActiveGameScreen';
 
-export type RoundPreviewMeta = {
-  finishType: FinishType;
-  finisherPlayerId: string | null;
-};
+export type { RoundPreviewMeta } from '../roundEntry/previewState';
 
 type RoundPreviewScreenProps = {
   game: ActiveGameData;

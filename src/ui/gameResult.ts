@@ -77,25 +77,40 @@ export function safePlayerScore(player: ActiveGamePlayer): number {
 
 /**
  * Ceza puanı sıralaması: düşük daha iyi.
- * Eşitlikte mevcut roster sırası korunur (stabil).
+ * Eşitlikte roster sırası korunur (stabil, id→index haritası ile).
  */
 export function rankPlayersByPenaltyAscending(
   players: ActiveGamePlayer[],
 ): GameResultPlayerStanding[] {
+  const rosterIndex = new Map<string, number>();
+  players.forEach((player, index) => {
+    rosterIndex.set(player.id, index);
+  });
+
   const sorted = [...players].sort((a, b) => {
     const scoreDiff = safePlayerScore(a) - safePlayerScore(b);
     if (scoreDiff !== 0) {
       return scoreDiff;
     }
-    return players.indexOf(a) - players.indexOf(b);
+    return (rosterIndex.get(a.id) ?? 0) - (rosterIndex.get(b.id) ?? 0);
   });
 
-  return sorted.map((player, index) => ({
-    rank: index + 1,
-    playerId: player.id,
-    name: player.name?.trim() || 'Oyuncu',
-    totalScore: safePlayerScore(player),
-  }));
+  // Dense ranks: eşit puanda aynı sıra numarası.
+  const standings: GameResultPlayerStanding[] = [];
+  for (let index = 0; index < sorted.length; index += 1) {
+    const player = sorted[index];
+    const score = safePlayerScore(player);
+    const previous = standings[index - 1];
+    const rank =
+      previous && previous.totalScore === score ? previous.rank : index + 1;
+    standings.push({
+      rank,
+      playerId: player.id,
+      name: player.name?.trim() || 'Oyuncu',
+      totalScore: score,
+    });
+  }
+  return standings;
 }
 
 function calculatePairedWinner(

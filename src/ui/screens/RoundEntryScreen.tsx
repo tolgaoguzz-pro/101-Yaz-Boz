@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
@@ -39,16 +40,19 @@ import {
   shouldShowPlayerEntryCards,
 } from '../roundEntry/playerFieldRules';
 import {
+  buildRoundPreviewError,
+  buildRoundPreviewState,
+  CLOSED_ROUND_PREVIEW,
+  RoundPreviewState,
+} from '../roundEntry/previewState';
+import {
   RoundEntryFinishType,
   RoundEntryForm,
   RoundEntryPlayerForm,
 } from '../roundEntry/types';
 import { colors, radii, spacing, typography } from '../theme';
 import { ActiveGameData } from './ActiveGameScreen';
-import {
-  RoundPreviewMeta,
-  RoundPreviewScreen,
-} from './RoundPreviewScreen';
+import { RoundPreviewScreen } from './RoundPreviewScreen';
 
 type RoundEntryScreenProps = {
   game: ActiveGameData;
@@ -58,9 +62,9 @@ type RoundEntryScreenProps = {
 
 const FINISH_OPTIONS: { value: RoundEntryFinishType; label: string }[] = [
   { value: 'normal', label: 'Normal' },
-  { value: 'okey', label: 'Okeyle' },
+  { value: 'okey', label: 'Okey' },
   { value: 'fromHand', label: 'Elden' },
-  { value: 'fromHandAndOkey', label: 'Elden+Okey' },
+  { value: 'fromHandAndOkey', label: 'E+O' },
   { value: 'none', label: 'Yok' },
 ];
 
@@ -69,6 +73,7 @@ type ChoiceChipProps = {
   selected: boolean;
   disabled?: boolean;
   onPress: () => void;
+  compact?: boolean;
 };
 
 function ChoiceChip({
@@ -76,6 +81,7 @@ function ChoiceChip({
   selected,
   disabled = false,
   onPress,
+  compact = false,
 }: ChoiceChipProps) {
   return (
     <Pressable
@@ -84,6 +90,7 @@ function ChoiceChip({
       onPress={onPress}
       style={({ pressed }) => [
         styles.chip,
+        compact && styles.chipCompact,
         selected && styles.chipSelected,
         disabled && styles.chipDisabled,
         pressed && !disabled && styles.chipPressed,
@@ -92,9 +99,11 @@ function ChoiceChip({
       <Text
         style={[
           styles.chipLabel,
+          compact && styles.chipLabelCompact,
           selected && styles.chipLabelSelected,
           disabled && styles.chipLabelDisabled,
         ]}
+        numberOfLines={1}
       >
         {label}
       </Text>
@@ -107,6 +116,8 @@ export function RoundEntryScreen({
   onBack,
   onSaveRound,
 }: RoundEntryScreenProps) {
+  const { height } = useWindowDimensions();
+  const compact = height < 740;
   const rosterPlayers = useMemo(() => playersFromActiveGame(game), [game]);
   const engineRoster = useMemo(() => buildRosterFromActiveGame(game), [game]);
   const isIndividual = resolveGameMode(game.gameMode) === 'individual';
@@ -114,12 +125,9 @@ export function RoundEntryScreen({
   const [form, setForm] = useState<RoundEntryForm>(() =>
     createInitialRoundEntryForm(rosterPlayers),
   );
-  const [preview, setPreview] = useState<CalculateRoundResult | null>(null);
-  const [previewMeta, setPreviewMeta] = useState<RoundPreviewMeta | null>(
-    null,
-  );
+  const [previewState, setPreviewState] =
+    useState<RoundPreviewState>(CLOSED_ROUND_PREVIEW);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const finishOptionsDisabled = form.finisherPlayerId === null;
   const visiblePlayerIds = getVisiblePlayerIds(form);
@@ -128,9 +136,7 @@ export function RoundEntryScreen({
     form.finisherPlayerId !== null && isHandStyleFinish(form.finishType);
 
   function clearPreview() {
-    setPreview(null);
-    setPreviewMeta(null);
-    setError(null);
+    setPreviewState(CLOSED_ROUND_PREVIEW);
   }
 
   function setFormAndNormalize(
@@ -191,39 +197,43 @@ export function RoundEntryScreen({
   }
 
   function handlePreview() {
-    Keyboard.dismiss();
     try {
       const roundInput = buildRoundInputFromForm(
         form,
         `round-${game.roundNumber}`,
       );
-      const result = isIndividual
+      const previewResult = isIndividual
         ? calculateIndividualRound(roundInput, game, DEFAULT_SCORE_RULES)
         : calculateRound(roundInput, DEFAULT_SCORE_RULES, engineRoster);
-      setError(null);
-      setPreview(result);
-      setPreviewMeta({
+      const meta = {
         finishType: form.finishType,
         finisherPlayerId: form.finisherPlayerId,
-      });
+      };
+      // Atomik state: visible + result aynı anda — ikinci dokunuş gerekmez.
+      setPreviewState(buildRoundPreviewState({ result: previewResult, meta }));
+      Keyboard.dismiss();
     } catch (caught) {
-      setPreview(null);
-      setPreviewMeta(null);
       const message =
         caught instanceof Error
           ? caught.message
           : 'El hesaplanırken bir hata oluştu.';
-      setError(message);
+      setPreviewState(buildRoundPreviewError(message));
+      Keyboard.dismiss();
     }
   }
 
   function handleSaveFromPreview() {
     Keyboard.dismiss();
-    if (!preview || !previewMeta || saving) {
+    if (
+      !previewState.visible ||
+      !previewState.result ||
+      !previewState.meta ||
+      saving
+    ) {
       return;
     }
     setSaving(true);
-    onSaveRound(preview, previewMeta);
+    onSaveRound(previewState.result, previewState.meta);
   }
 
   const nameByPlayerId = useMemo(() => {
@@ -241,18 +251,14 @@ export function RoundEntryScreen({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 4 : 0}
       >
-        <View style={styles.shell}>
-          <ScrollView
-            contentContainerStyle={styles.content}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-            showsVerticalScrollIndicator={false}
-          >
-            <Pressable
-              accessible={false}
-              onPress={Keyboard.dismiss}
-              style={styles.dismissArea}
-            >
+        <ScrollView
+          style={styles.flex}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="always"
+          keyboardDismissMode="on-drag"
+          scrollEnabled={false}
+          showsVerticalScrollIndicator={false}
+        >
             <View style={styles.topRow}>
               <Pressable
                 accessibilityRole="button"
@@ -264,31 +270,38 @@ export function RoundEntryScreen({
               >
                 <Text style={styles.backLabel}>Geri</Text>
               </Pressable>
-              <Text style={styles.title}>Yeni El</Text>
+              <View style={styles.titleBlock}>
+                <Text style={styles.title}>Yeni El</Text>
+                <Text style={styles.roundMeta}>
+                  {game.rounds.length + 1}. El
+                </Text>
+              </View>
             </View>
 
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Bitiren</Text>
-              <View style={styles.chipWrap}>
+              <View style={styles.grid2}>
                 {rosterPlayers.map((player) => (
                   <ChoiceChip
                     key={player.id}
                     label={player.name}
                     selected={form.finisherPlayerId === player.id}
                     onPress={() => selectFinisher(player.id)}
+                    compact={compact}
                   />
                 ))}
                 <ChoiceChip
-                  label="Kimse Bitmedi"
+                  label="Bitmedi"
                   selected={form.finisherPlayerId === null}
                   onPress={() => selectFinisher(null)}
+                  compact={compact}
                 />
               </View>
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Bitiş türü</Text>
-              <View style={styles.chipWrap}>
+              <Text style={styles.sectionTitle}>Bitiş</Text>
+              <View style={styles.gridFinish}>
                 {FINISH_OPTIONS.map((option) => {
                   const isNoneOption = option.value === 'none';
                   const disabled = finishOptionsDisabled
@@ -301,6 +314,7 @@ export function RoundEntryScreen({
                       selected={form.finishType === option.value}
                       disabled={disabled}
                       onPress={() => selectFinishType(option.value)}
+                      compact
                     />
                   );
                 })}
@@ -309,12 +323,19 @@ export function RoundEntryScreen({
 
             {showHandAutoNote ? (
               <Text style={styles.infoText}>
-                Elden bitiş: diğerleri açmamış sayılır.
+                Diğer üç oyuncu açmamış sayılacak.
               </Text>
             ) : null}
 
-            {showPlayerCards
-              ? visiblePlayerIds.map((playerId) => {
+            {showPlayerCards ? (
+              <View style={styles.table}>
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.colPlayer, styles.th]}>Oyuncu</Text>
+                  <Text style={[styles.colStatus, styles.th]}>Durum</Text>
+                  <Text style={[styles.colOpen, styles.th]}>Açılış</Text>
+                  <Text style={[styles.colTiles, styles.th]}>Kalan</Text>
+                </View>
+                {visiblePlayerIds.map((playerId) => {
                   const playerForm = form.players.find(
                     (player) => player.playerId === playerId,
                   );
@@ -322,47 +343,56 @@ export function RoundEntryScreen({
                   if (!playerForm || !playerName) {
                     return null;
                   }
-
                   const mode = getPlayerCardMode(form, playerId);
                   const opened = playerForm.openType !== 'didNotOpen';
 
                   return (
-                    <View key={playerId} style={styles.playerCard}>
-                      <Text style={styles.playerTitle}>{playerName}</Text>
-
-                      {mode.showOpenedChoice ? (
-                        <View style={styles.chipWrap}>
-                          <ChoiceChip
-                            label="Açtı"
-                            selected={opened}
-                            onPress={() => setOpened(playerId, true)}
-                          />
-                          <ChoiceChip
-                            label="Açmadı"
-                            selected={!opened}
-                            onPress={() => setOpened(playerId, false)}
-                          />
-                        </View>
-                      ) : null}
-
-                      {mode.showSeriesDoubles ? (
-                        <View style={styles.chipWrap}>
-                          <ChoiceChip
-                            label="Seri"
-                            selected={playerForm.openType === 'series'}
-                            onPress={() => setOpenKind(playerId, 'series')}
-                          />
-                          <ChoiceChip
-                            label="Çift"
-                            selected={playerForm.openType === 'doubles'}
-                            onPress={() => setOpenKind(playerId, 'doubles')}
-                          />
-                        </View>
-                      ) : null}
-
-                      {mode.showRemainingTiles ? (
-                        <View style={styles.tileRow}>
-                          <Text style={styles.tileLabel}>Kalan taş</Text>
+                    <View key={playerId} style={styles.tableRow}>
+                      <Text style={styles.colPlayer} numberOfLines={1}>
+                        {playerName}
+                      </Text>
+                      <View style={styles.colStatus}>
+                        {mode.showOpenedChoice ? (
+                          <View style={styles.miniRow}>
+                            <ChoiceChip
+                              label="Açtı"
+                              selected={opened}
+                              onPress={() => setOpened(playerId, true)}
+                              compact
+                            />
+                            <ChoiceChip
+                              label="Yok"
+                              selected={!opened}
+                              onPress={() => setOpened(playerId, false)}
+                              compact
+                            />
+                          </View>
+                        ) : (
+                          <Text style={styles.muted}>—</Text>
+                        )}
+                      </View>
+                      <View style={styles.colOpen}>
+                        {mode.showSeriesDoubles ? (
+                          <View style={styles.miniRow}>
+                            <ChoiceChip
+                              label="Seri"
+                              selected={playerForm.openType === 'series'}
+                              onPress={() => setOpenKind(playerId, 'series')}
+                              compact
+                            />
+                            <ChoiceChip
+                              label="Çift"
+                              selected={playerForm.openType === 'doubles'}
+                              onPress={() => setOpenKind(playerId, 'doubles')}
+                              compact
+                            />
+                          </View>
+                        ) : (
+                          <Text style={styles.muted}>—</Text>
+                        )}
+                      </View>
+                      <View style={styles.colTiles}>
+                        {mode.showRemainingTiles ? (
                           <TextInput
                             keyboardType="number-pad"
                             value={playerForm.remainingTilePointsText}
@@ -384,16 +414,19 @@ export function RoundEntryScreen({
                             placeholderTextColor={colors.textSecondary}
                             style={styles.tileInput}
                           />
-                        </View>
-                      ) : null}
+                        ) : (
+                          <Text style={styles.muted}>—</Text>
+                        )}
+                      </View>
                     </View>
                   );
-                })
-              : null}
+                })}
+              </View>
+            ) : null}
 
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-            </Pressable>
-          </ScrollView>
+            {previewState.error ? (
+              <Text style={styles.error}>{previewState.error}</Text>
+            ) : null}
 
           <View style={styles.footer}>
             <PrimaryButton label="Önizle" onPress={handlePreview} />
@@ -408,20 +441,20 @@ export function RoundEntryScreen({
               <Text style={styles.cancelLabel}>İptal</Text>
             </Pressable>
           </View>
-        </View>
-      </KeyboardAvoidingView>
+          </ScrollView>
+        </KeyboardAvoidingView>
 
       <Modal
-        visible={preview !== null && previewMeta !== null}
+        visible={previewState.visible}
         animationType="slide"
         presentationStyle="fullScreen"
         onRequestClose={clearPreview}
       >
-        {preview && previewMeta ? (
+        {previewState.result && previewState.meta ? (
           <RoundPreviewScreen
             game={game}
-            result={preview}
-            meta={previewMeta}
+            result={previewState.result}
+            meta={previewState.meta}
             saving={saving}
             onBack={clearPreview}
             onSave={handleSaveFromPreview}
@@ -444,22 +477,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    flexGrow: 1,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.xs,
     paddingBottom: spacing.sm,
     gap: spacing.sm,
-  },
-  dismissArea: {
-    gap: spacing.sm,
+    justifyContent: 'space-between',
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    minHeight: 44,
   },
   backButton: {
-    minHeight: 44,
+    minHeight: 40,
     minWidth: 44,
     paddingHorizontal: spacing.sm,
     justifyContent: 'center',
@@ -472,26 +503,41 @@ const styles = StyleSheet.create({
     ...typography.buttonSecondary,
     color: colors.primary,
   },
+  titleBlock: {
+    flex: 1,
+  },
   title: {
     fontSize: 22,
     fontWeight: '700',
     color: colors.text,
   },
+  roundMeta: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
   section: {
-    gap: 6,
+    gap: 4,
   },
   sectionTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: colors.primary,
   },
-  chipWrap: {
+  grid2: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  gridFinish: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
   },
   chip: {
-    minHeight: 44,
+    minHeight: 40,
+    minWidth: '30%',
+    flexGrow: 1,
     paddingHorizontal: spacing.sm,
     borderRadius: radii.sm,
     borderWidth: 1,
@@ -499,6 +545,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  chipCompact: {
+    minHeight: 34,
+    minWidth: 0,
+    paddingHorizontal: 8,
   },
   chipSelected: {
     backgroundColor: colors.primary,
@@ -511,9 +562,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   chipLabel: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: colors.primary,
+  },
+  chipLabelCompact: {
+    fontSize: 12,
   },
   chipLabelSelected: {
     color: colors.textOnPrimary,
@@ -522,44 +576,75 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   infoText: {
-    ...typography.infoLabel,
+    fontSize: 12,
+    fontWeight: '600',
     color: colors.textSecondary,
   },
-  playerCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
+  table: {
     borderWidth: 1,
     borderColor: colors.border,
-    gap: 6,
+    borderRadius: radii.sm,
+    backgroundColor: colors.surfaceElevated,
+    overflow: 'hidden',
   },
-  playerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: colors.surface,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
   },
-  tileRow: {
+  tableRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+    minHeight: 44,
   },
-  tileLabel: {
-    ...typography.infoLabel,
+  th: {
+    fontWeight: '700',
+    color: colors.primary,
+    fontSize: 11,
+  },
+  colPlayer: {
+    width: 62,
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  colStatus: {
+    flex: 1.1,
+  },
+  colOpen: {
+    flex: 1.1,
+  },
+  colTiles: {
+    width: 56,
+    alignItems: 'center',
+  },
+  miniRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  muted: {
+    fontSize: 12,
     color: colors.textSecondary,
-    minWidth: 72,
+    textAlign: 'center',
   },
   tileInput: {
-    flex: 1,
-    minHeight: 44,
+    width: 52,
+    minHeight: 34,
     borderRadius: radii.sm,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surfaceElevated,
-    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 4,
     color: colors.text,
-    fontSize: 17,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   error: {
     ...typography.body,
@@ -568,57 +653,14 @@ const styles = StyleSheet.create({
     borderRadius: radii.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-    overflow: 'hidden',
-  },
-  resultCard: {
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radii.sm,
-    padding: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 4,
-  },
-  resultTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  resultHint: {
-    ...typography.infoLabel,
-    color: colors.textSecondary,
-  },
-  resultDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: 4,
-  },
-  resultRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
-  resultName: {
-    fontSize: 15,
-    color: colors.text,
-    flex: 1,
-  },
-  resultValue: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.text,
   },
   footer: {
-    paddingHorizontal: spacing.md,
+    marginTop: 'auto' as const,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.background,
     gap: spacing.xs,
   },
   cancelButton: {
-    minHeight: 44,
+    minHeight: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },

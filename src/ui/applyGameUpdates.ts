@@ -11,7 +11,7 @@ import {
   playerIdFromIndividualTeamId,
   containerTeamScoresFromPlayers,
 } from './individualRound';
-import { PLAYER_IDS, TEAM_IDS } from './gameRoster';
+import { TEAM_IDS } from './gameRoster';
 import {
   ActiveGameData,
   ActiveGamePlayer,
@@ -117,6 +117,12 @@ export function applyRoundResultToPairedGame(
     score: team.score,
   }));
 
+  const finishBonusPlayerId = meta.finisherPlayerId;
+  const bonusAmount =
+    finishBonusPlayerId && result.finishTeamBonus.amount !== 0
+      ? result.finishTeamBonus.amount
+      : 0;
+
   const savedRound: SavedRoundSummary = {
     roundNumber: game.roundNumber,
     players: playerScores,
@@ -128,10 +134,42 @@ export function applyRoundResultToPairedGame(
     gameMode: 'paired',
     finishType: meta.finishType,
     finisherPlayerId: meta.finisherPlayerId,
+    finishBonusPlayerId,
   };
+
+  function nextPlayerTotal(player: ActiveGamePlayer): number {
+    const roundScore = scoreById(playerScores, player.id, 'playerId');
+    const bonus = player.id === finishBonusPlayerId ? bonusAmount : 0;
+    return player.totalScore + roundScore + bonus;
+  }
 
   const team1 = game.teams[0];
   const team2 = game.teams[1];
+
+  const team1Players: [ActiveGamePlayer, ActiveGamePlayer] = [
+    {
+      id: team1.players[0].id,
+      name: team1.players[0].name,
+      totalScore: nextPlayerTotal(team1.players[0]),
+    },
+    {
+      id: team1.players[1].id,
+      name: team1.players[1].name,
+      totalScore: nextPlayerTotal(team1.players[1]),
+    },
+  ];
+  const team2Players: [ActiveGamePlayer, ActiveGamePlayer] = [
+    {
+      id: team2.players[0].id,
+      name: team2.players[0].name,
+      totalScore: nextPlayerTotal(team2.players[0]),
+    },
+    {
+      id: team2.players[1].id,
+      name: team2.players[1].name,
+      totalScore: nextPlayerTotal(team2.players[1]),
+    },
+  ];
 
   const scored: ActiveGameData = {
     ...game,
@@ -145,44 +183,14 @@ export function applyRoundResultToPairedGame(
         totalScore:
           team1.totalScore +
           scoreById(teamScores, TEAM_IDS.team1, 'teamId'),
-        players: [
-          {
-            id: team1.players[0].id,
-            name: team1.players[0].name,
-            totalScore:
-              team1.players[0].totalScore +
-              scoreById(playerScores, PLAYER_IDS.player1, 'playerId'),
-          },
-          {
-            id: team1.players[1].id,
-            name: team1.players[1].name,
-            totalScore:
-              team1.players[1].totalScore +
-              scoreById(playerScores, PLAYER_IDS.player2, 'playerId'),
-          },
-        ],
+        players: team1Players,
       },
       {
         name: team2.name,
         totalScore:
           team2.totalScore +
           scoreById(teamScores, TEAM_IDS.team2, 'teamId'),
-        players: [
-          {
-            id: team2.players[0].id,
-            name: team2.players[0].name,
-            totalScore:
-              team2.players[0].totalScore +
-              scoreById(playerScores, PLAYER_IDS.player3, 'playerId'),
-          },
-          {
-            id: team2.players[1].id,
-            name: team2.players[1].name,
-            totalScore:
-              team2.players[1].totalScore +
-              scoreById(playerScores, PLAYER_IDS.player4, 'playerId'),
-          },
-        ],
+        players: team2Players,
       },
     ],
   };
