@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 
+import { APP_INFO, DEVELOPER_CREDIT } from '../../config/appInfo';
 import { HomeInfoCard } from '../components/HomeInfoCard';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SecondaryButton } from '../components/SecondaryButton';
@@ -23,11 +24,9 @@ type HomeScreenProps = {
   onNewGame: () => void;
   onRestart: () => void;
   onAbandon: () => void;
+  onTournaments: () => void;
+  onAbout: () => void;
 };
-
-function showComingSoon(feature: string) {
-  Alert.alert(feature, 'Henüz hazır değil. Yakında eklenecek.');
-}
 
 export function HomeScreen({
   activeGame,
@@ -35,6 +34,8 @@ export function HomeScreen({
   onNewGame,
   onRestart,
   onAbandon,
+  onTournaments,
+  onAbout,
 }: HomeScreenProps) {
   function handleNewGame() {
     if (!activeGame) {
@@ -166,19 +167,23 @@ export function HomeScreen({
 
         <View style={styles.actions}>
           <PrimaryButton label="Yeni Oyun" onPress={handleNewGame} />
-          <View style={styles.secondaryRow}>
-            <SecondaryButton
-              label="Geçmiş"
-              onPress={() => showComingSoon('Geçmiş')}
-            />
-            <SecondaryButton
-              label="Ayarlar"
-              onPress={() => showComingSoon('Ayarlar')}
-            />
-          </View>
+          <SecondaryButton
+            label="Turnuvalar ve Geçmiş"
+            onPress={onTournaments}
+            style={styles.fullSecondary}
+          />
         </View>
 
         <HomeInfoCard />
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={onAbout}
+          style={styles.aboutLink}
+        >
+          <Text style={styles.aboutTitle}>{APP_INFO.name}</Text>
+          <Text style={styles.aboutCredit}>{DEVELOPER_CREDIT}</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -270,8 +275,24 @@ const styles = StyleSheet.create({
   actions: {
     gap: spacing.sm,
   },
-  secondaryRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
+  fullSecondary: {
+    flexGrow: 0,
+    width: '100%',
+  },
+  aboutLink: {
+    alignItems: 'center',
+    gap: 2,
+    paddingVertical: spacing.sm,
+  },
+  aboutTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  aboutCredit: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: colors.textSecondary,
+    opacity: 0.85,
   },
 });

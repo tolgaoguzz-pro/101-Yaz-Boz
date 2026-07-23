@@ -16,13 +16,17 @@ import { ActiveGameData } from './ActiveGameScreen';
 
 type GameResultScreenProps = {
   game: ActiveGameData;
+  seriesSummaryLine?: string | null;
   onRematch: () => void;
+  onViewTournament: () => void;
   onNewTeams: () => void;
 };
 
 export function GameResultScreen({
   game,
+  seriesSummaryLine,
   onRematch,
+  onViewTournament,
   onNewTeams,
 }: GameResultScreenProps) {
   const result = useMemo(() => calculateGameResult(game), [game]);
@@ -114,6 +118,13 @@ export function GameResultScreen({
             </View>
           )}
 
+          {seriesSummaryLine ? (
+            <View style={styles.seriesCard}>
+              <Text style={styles.cardLabel}>Turnuva Durumu</Text>
+              <Text style={styles.seriesLine}>{seriesSummaryLine}</Text>
+            </View>
+          ) : null}
+
           {result.firstPlacePlayers.length > 0 ? (
             <View style={styles.topCard}>
               <Text style={styles.cardLabel}>
@@ -152,6 +163,11 @@ export function GameResultScreen({
           <PrimaryButton
             label="Aynı Oyuncularla Yeni Oyun"
             onPress={onRematch}
+          />
+          <SecondaryButton
+            label="Turnuva Geçmişini Gör"
+            onPress={onViewTournament}
+            style={styles.secondaryAction}
           />
           <SecondaryButton
             label="Yeni Takım ve Oyuncular"
@@ -211,6 +227,20 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: spacing.md,
     gap: spacing.sm,
+  },
+  seriesCard: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  seriesLine: {
+    fontSize: 17,
+    fontWeight: '700',
+    lineHeight: 24,
+    color: colors.text,
   },
   topCard: {
     backgroundColor: colors.surfaceElevated,

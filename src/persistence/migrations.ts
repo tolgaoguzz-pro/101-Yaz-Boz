@@ -1,4 +1,7 @@
-import { ACTIVE_GAME_SNAPSHOT_SCHEMA_VERSION } from './schema';
+import {
+  ACTIVE_GAME_SNAPSHOT_SCHEMA_VERSION,
+  COMPLETED_GAME_SNAPSHOT_SCHEMA_VERSION,
+} from './schema';
 
 export type Migration = {
   version: number;
@@ -22,6 +25,25 @@ CREATE TABLE IF NOT EXISTS active_game (
 );
 `,
   },
+  {
+    version: 2,
+    sql: `
+CREATE TABLE IF NOT EXISTS completed_games (
+  id TEXT PRIMARY KEY NOT NULL,
+  matchup_key TEXT NOT NULL,
+  game_mode TEXT NOT NULL,
+  completed_at TEXT NOT NULL,
+  snapshot_json TEXT NOT NULL,
+  schema_version INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_completed_games_matchup_key
+  ON completed_games (matchup_key);
+
+CREATE INDEX IF NOT EXISTS idx_completed_games_completed_at
+  ON completed_games (completed_at);
+`,
+  },
 ];
 
 export const LATEST_MIGRATION_VERSION =
@@ -35,4 +57,7 @@ export function buildMigrationSql(fromVersion: number): string {
     .join('\n');
 }
 
-export { ACTIVE_GAME_SNAPSHOT_SCHEMA_VERSION };
+export {
+  ACTIVE_GAME_SNAPSHOT_SCHEMA_VERSION,
+  COMPLETED_GAME_SNAPSHOT_SCHEMA_VERSION,
+};

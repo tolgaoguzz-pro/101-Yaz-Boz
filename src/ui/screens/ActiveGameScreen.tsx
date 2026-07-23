@@ -14,12 +14,11 @@ import type { GameMode } from '../gameMode';
 import type { FinishType } from '../../engine/models';
 import type { GameActivityEvent, GameStatus } from '../gameActivity';
 import { resolveGameMode } from '../gameMode';
-import { TEAM_IDS } from '../gameRoster';
 import {
   rankPlayersByPenaltyAscending,
   rosterPlayersInOrder,
 } from '../gameResult';
-import { resolveActivityLog } from '../gameLifecycle';
+import { GameActivityLogView } from '../components/GameActivityLogView';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SecondaryButton } from '../components/SecondaryButton';
 import {
@@ -73,6 +72,8 @@ export type ActiveGameData = {
   completedAt?: string;
   pausedAt?: string;
   activityLog?: GameActivityEvent[];
+  /** Geçmiş kaydı bir kez yazıldıktan sonra idempotent id. */
+  completedGameRecordId?: string;
 };
 
 type ActiveGameScreenProps = {
@@ -84,20 +85,6 @@ type ActiveGameScreenProps = {
   onFinishEarly: () => void;
   onAbandon: () => void;
 };
-
-function scoreByPlayerId(
-  scores: { playerId: string; score: number }[],
-  playerId: string,
-): number {
-  return scores.find((player) => player.playerId === playerId)?.score ?? 0;
-}
-
-function scoreByTeamId(
-  scores: { teamId: string; score: number }[],
-  teamId: string,
-): number {
-  return scores.find((team) => team.teamId === teamId)?.score ?? 0;
-}
 
 function TeamCard({
   team,
@@ -153,87 +140,6 @@ function IndividualStandingsCard({ game }: { game: ActiveGameData }) {
   );
 }
 
-function ActivityLogItem({
-  event,
-  game,
-  isLatest,
-  isIndividual,
-}: {
-  event: GameActivityEvent;
-  game: ActiveGameData;
-  isLatest: boolean;
-  isIndividual: boolean;
-}) {
-  const rosterPlayers = rosterPlayersInOrder(game);
-
-  if (event.type === 'penalty') {
-    return (
-      <View style={[styles.roundBlock, isLatest && styles.roundBlockLatest]}>
-        <Text style={styles.roundTitle}>Ceza</Text>
-        <Text style={styles.historyName}>
-          {event.playerName} · {event.penaltyLabel} +{event.amount}
-        </Text>
-        <Text style={styles.bonusLine}>
-          #{event.sequence} ·{' '}
-          {new Date(event.createdAt).toLocaleString('tr-TR')}
-        </Text>
-      </View>
-    );
-  }
-
-  const bonusPlayer = event.finishBonusPlayerId
-    ? rosterPlayers.find((player) => player.id === event.finishBonusPlayerId)
-    : null;
-
-  return (
-    <View style={[styles.roundBlock, isLatest && styles.roundBlockLatest]}>
-      <Text style={styles.roundTitle}>{event.roundNumber}. El</Text>
-      <View style={styles.roundScores}>
-        {rosterPlayers.map((player) => (
-          <View key={player.id} style={styles.historyRow}>
-            <Text style={styles.historyName} numberOfLines={1}>
-              {player.name}
-            </Text>
-            <Text style={styles.historyScore}>
-              {scoreByPlayerId(event.playerScores, player.id)}
-            </Text>
-          </View>
-        ))}
-      </View>
-      {isIndividual ? (
-        event.finishBonusAmount !== 0 ? (
-          <Text style={styles.bonusLine}>
-            Bitiş bonusu · {bonusPlayer?.name ?? 'Bitiren'}{' '}
-            {event.finishBonusAmount}
-          </Text>
-        ) : null
-      ) : (
-        <>
-          <Text style={styles.teamTotalLabel}>Takım Toplamı:</Text>
-          <View style={styles.roundScores}>
-            <View style={styles.historyRow}>
-              <Text style={styles.historyName} numberOfLines={1}>
-                {game.teams[0].name}
-              </Text>
-              <Text style={styles.historyScore}>
-                {scoreByTeamId(event.teamScores, TEAM_IDS.team1)}
-              </Text>
-            </View>
-            <View style={styles.historyRow}>
-              <Text style={styles.historyName} numberOfLines={1}>
-                {game.teams[1].name}
-              </Text>
-              <Text style={styles.historyScore}>
-                {scoreByTeamId(event.teamScores, TEAM_IDS.team2)}
-              </Text>
-            </View>
-          </View>
-        </>
-      )}
-    </View>
-  );
-}
-
 export function ActiveGameScreen({
   game,
   onHome,
@@ -249,8 +155,6 @@ export function ActiveGameScreen({
   const playedRounds = game.rounds.length;
   const targetRounds = resolveTargetRoundCount(game.targetRoundCount);
   const roundsLeft = remainingRoundCount(playedRounds, targetRounds);
-  const activityLog = useMemo(() => resolveActivityLog(game), [game]);
-  const lastIndex = activityLog.length - 1;
 
   function confirmFinishEarly() {
     Alert.alert(
@@ -326,21 +230,7 @@ export function ActiveGameScreen({
         ) : null}
 
         <Text style={styles.historyHeading}>Oyun Günlüğü</Text>
-        {activityLog.length === 0 ? (
-          <Text style={styles.emptyHistory}>Henüz işlem yok</Text>
-        ) : (
-          <View style={styles.logList}>
-            {activityLog.map((event, index) => (
-              <ActivityLogItem
-                key={event.id}
-                event={event}
-                game={game}
-                isLatest={index === lastIndex}
-                isIndividual={isIndividual}
-              />
-            ))}
-          </View>
-        )}
+        <GameActivityLogView game={game} />
 
         <View style={styles.actionsBlock}>
           <SecondaryButton
@@ -529,70 +419,6 @@ const styles = StyleSheet.create({
   historyHeading: {
     ...typography.buttonSecondary,
     color: colors.primary,
-  },
-  emptyHistory: {
-    ...typography.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    paddingVertical: spacing.md,
-  },
-  logList: {
-    gap: spacing.sm,
-  },
-  roundBlock: {
-    gap: 4,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radii.sm,
-  },
-  roundBlockLatest: {
-    backgroundColor: colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  roundTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    lineHeight: 20,
-    color: colors.text,
-    marginBottom: 2,
-  },
-  roundScores: {
-    gap: 2,
-  },
-  historyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    minHeight: 22,
-  },
-  historyName: {
-    fontSize: 14,
-    fontWeight: '400',
-    lineHeight: 20,
-    color: colors.text,
-    flex: 1,
-  },
-  historyScore: {
-    fontSize: 14,
-    fontWeight: '600',
-    lineHeight: 20,
-    color: colors.textSecondary,
-  },
-  teamTotalLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 18,
-    color: colors.primaryMuted,
-    marginTop: 4,
-  },
-  bonusLine: {
-    fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 18,
-    color: colors.primaryMuted,
-    marginTop: 4,
   },
   actionsBlock: {
     gap: spacing.sm,

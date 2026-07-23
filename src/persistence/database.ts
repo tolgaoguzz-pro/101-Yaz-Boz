@@ -5,7 +5,7 @@ import { DATABASE_NAME } from './schema';
 
 export type SqlDatabase = Pick<
   SQLiteDatabase,
-  'execAsync' | 'runAsync' | 'getFirstAsync'
+  'execAsync' | 'runAsync' | 'getFirstAsync' | 'getAllAsync'
 >;
 
 type DatabaseModule = {

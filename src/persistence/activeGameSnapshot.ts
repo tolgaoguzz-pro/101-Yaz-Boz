@@ -268,6 +268,9 @@ export function parseActiveGameSnapshot(
   if (typeof parsed.pausedAt === 'string') {
     game.pausedAt = parsed.pausedAt;
   }
+  if (typeof parsed.completedGameRecordId === 'string') {
+    game.completedGameRecordId = parsed.completedGameRecordId;
+  }
 
   return game;
 }

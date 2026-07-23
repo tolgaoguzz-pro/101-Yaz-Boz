@@ -144,6 +144,7 @@ export function restartGame(game: ActiveGameData): ActiveGameData {
     updatedAt: at,
     completedAt: undefined,
     pausedAt: undefined,
+    completedGameRecordId: undefined,
     teams: [
       {
         name: game.teams[0].name,

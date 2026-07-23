@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 
 import { usePersistedActiveGame } from './src/app/usePersistedActiveGame';
+import { ensureCompletedGamePersisted } from './src/domain/ensureCompletedGame';
+import { matchupKeyFromGame } from './src/domain/completedGame';
+import { calculateMatchupSeries } from './src/domain/tournament';
 import { CalculateRoundResult } from './src/engine/calculateRound';
+import { listCompletedGamesByMatchup } from './src/persistence/completedGameRepository';
 import {
   applyQuickPenaltyToGame,
   applyRoundResultToGame,
@@ -18,11 +22,14 @@ import {
   createRematchGame,
   isGameComplete,
 } from './src/ui/gameResult';
+import { buildSeriesSummaryLine } from './src/ui/tournamentPresentation';
 import {
   ActiveGameData,
   ActiveGameScreen,
 } from './src/ui/screens/ActiveGameScreen';
+import { AboutScreen } from './src/ui/screens/AboutScreen';
 import { AppLoadingScreen } from './src/ui/screens/AppLoadingScreen';
+import { CompletedGameDetailScreen } from './src/ui/screens/CompletedGameDetailScreen';
 import { GameResultScreen } from './src/ui/screens/GameResultScreen';
 import { HomeScreen } from './src/ui/screens/HomeScreen';
 import { NewGameScreen } from './src/ui/screens/NewGameScreen';
@@ -31,6 +38,8 @@ import {
   QuickPenaltySelection,
 } from './src/ui/screens/QuickPenaltyScreen';
 import { RoundEntryScreen } from './src/ui/screens/RoundEntryScreen';
+import { TournamentDetailScreen } from './src/ui/screens/TournamentDetailScreen';
+import { TournamentListScreen } from './src/ui/screens/TournamentListScreen';
 
 type Screen =
   | 'home'
@@ -38,10 +47,25 @@ type Screen =
   | 'activeGame'
   | 'roundEntry'
   | 'quickPenalty'
-  | 'gameResult';
+  | 'gameResult'
+  | 'tournamentList'
+  | 'tournamentDetail'
+  | 'completedGameDetail'
+  | 'about';
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
+  const [selectedMatchupKey, setSelectedMatchupKey] = useState<string | null>(
+    null,
+  );
+  const [selectedCompletedGameId, setSelectedCompletedGameId] = useState<
+    string | null
+  >(null);
+  const [seriesSummaryLine, setSeriesSummaryLine] = useState<string | null>(
+    null,
+  );
+  const completionInFlight = useRef(false);
+
   const {
     ready,
     activeGame,
@@ -49,6 +73,47 @@ export default function App() {
     commitActiveGame,
     updateActiveGame,
   } = usePersistedActiveGame();
+
+  async function persistCompletionAndShowResult(game: ActiveGameData) {
+    if (completionInFlight.current) {
+      return;
+    }
+    completionInFlight.current = true;
+    try {
+      const { game: completedGame } = await ensureCompletedGamePersisted(game);
+      // Bellekte sonuç kalsın; SQLite aktif snapshot temizlensin.
+      commitActiveGame(completedGame);
+
+      try {
+        const key = matchupKeyFromGame(completedGame);
+        const seriesGames = await listCompletedGamesByMatchup(key);
+        const series = calculateMatchupSeries(seriesGames);
+        setSeriesSummaryLine(buildSeriesSummaryLine(series));
+        setSelectedMatchupKey(key);
+      } catch (error) {
+        console.warn('[app] series summary load failed', error);
+        setSeriesSummaryLine(null);
+      }
+
+      setScreen('gameResult');
+    } finally {
+      completionInFlight.current = false;
+    }
+  }
+
+  useEffect(() => {
+    if (screen !== 'gameResult' || !activeGame) {
+      return;
+    }
+    if (!isGameComplete(activeGame)) {
+      return;
+    }
+    if (activeGame.completedGameRecordId) {
+      return;
+    }
+    void persistCompletionAndShowResult(activeGame);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, activeGame?.completedGameRecordId]);
 
   if (!ready) {
     return (
@@ -84,8 +149,12 @@ export default function App() {
     }
 
     const nextGame = applyRoundResultToGame(activeGame, result, meta);
+    if (isGameComplete(nextGame)) {
+      void persistCompletionAndShowResult(nextGame);
+      return;
+    }
     commitActiveGame(nextGame);
-    setScreen(isGameComplete(nextGame) ? 'gameResult' : 'activeGame');
+    setScreen('activeGame');
   }
 
   function handleApplyPenalty(selection: QuickPenaltySelection) {
@@ -95,11 +164,13 @@ export default function App() {
 
   function handleRematch() {
     updateActiveGame((current) => createRematchGame(current));
+    setSeriesSummaryLine(null);
     setScreen('activeGame');
   }
 
   function handleNewTeams() {
     commitActiveGame(null);
+    setSeriesSummaryLine(null);
     setScreen('newGame');
   }
 
@@ -114,8 +185,11 @@ export default function App() {
   }
 
   function handleFinishEarly() {
-    updateActiveGame((current) => finishGameEarly(current));
-    setScreen('gameResult');
+    if (!activeGame) {
+      return;
+    }
+    const finished = finishGameEarly(activeGame);
+    void persistCompletionAndShowResult(finished);
   }
 
   function handleAbandonFromActive() {
@@ -132,6 +206,14 @@ export default function App() {
     commitActiveGame(null);
   }
 
+  function handleViewTournamentFromResult() {
+    if (selectedMatchupKey) {
+      setScreen('tournamentDetail');
+      return;
+    }
+    setScreen('tournamentList');
+  }
+
   return (
     <>
       {screen === 'home' ? (
@@ -141,6 +223,8 @@ export default function App() {
           onNewGame={handleNewGameFromHome}
           onRestart={handleRestartFromHome}
           onAbandon={handleAbandonFromHome}
+          onTournaments={() => setScreen('tournamentList')}
+          onAbout={() => setScreen('about')}
         />
       ) : null}
       {screen === 'newGame' ? (
@@ -177,9 +261,43 @@ export default function App() {
       {screen === 'gameResult' && activeGame ? (
         <GameResultScreen
           game={activeGame}
+          seriesSummaryLine={seriesSummaryLine}
           onRematch={handleRematch}
+          onViewTournament={handleViewTournamentFromResult}
           onNewTeams={handleNewTeams}
         />
+      ) : null}
+      {screen === 'tournamentList' ? (
+        <TournamentListScreen
+          onBack={() => setScreen('home')}
+          onOpenMatchup={(key) => {
+            setSelectedMatchupKey(key);
+            setScreen('tournamentDetail');
+          }}
+          onStartNewGame={() => {
+            commitActiveGame(null);
+            setScreen('newGame');
+          }}
+        />
+      ) : null}
+      {screen === 'tournamentDetail' && selectedMatchupKey ? (
+        <TournamentDetailScreen
+          matchupKey={selectedMatchupKey}
+          onBack={() => setScreen('tournamentList')}
+          onOpenGame={(gameId) => {
+            setSelectedCompletedGameId(gameId);
+            setScreen('completedGameDetail');
+          }}
+        />
+      ) : null}
+      {screen === 'completedGameDetail' && selectedCompletedGameId ? (
+        <CompletedGameDetailScreen
+          gameId={selectedCompletedGameId}
+          onBack={() => setScreen('tournamentDetail')}
+        />
+      ) : null}
+      {screen === 'about' ? (
+        <AboutScreen onBack={() => setScreen('home')} />
       ) : null}
       <StatusBar style="dark" />
     </>

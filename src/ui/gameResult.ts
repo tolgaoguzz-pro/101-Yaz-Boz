@@ -279,5 +279,6 @@ export function createRematchGame(game: ActiveGameData): ActiveGameData {
     updatedAt: at,
     completedAt: undefined,
     pausedAt: undefined,
+    completedGameRecordId: undefined,
   };
 }
