@@ -10,6 +10,7 @@ import {
 
 import { TEAM_IDS } from '../gameRoster';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { SecondaryButton } from '../components/SecondaryButton';
 import { colors, radii, spacing, typography } from '../theme';
 
 export type ActiveGamePlayer = {
@@ -31,17 +32,25 @@ export type SavedRoundSummary = {
   finishTeamBonus: { teamId: string | null; amount: number };
 };
 
+export type LastGameAction = {
+  playerName: string;
+  penaltyLabel: string;
+  amount: number;
+};
+
 export type ActiveGameData = {
   teams: [ActiveGameTeam, ActiveGameTeam];
   /** Bir sonraki oynanacak el numarası. */
   roundNumber: number;
   rounds: SavedRoundSummary[];
+  lastAction: LastGameAction | null;
 };
 
 type ActiveGameScreenProps = {
   game: ActiveGameData;
   onHome: () => void;
   onNewRound: () => void;
+  onAddPenalty: () => void;
 };
 
 function TeamCard({
@@ -80,6 +89,7 @@ export function ActiveGameScreen({
   game,
   onHome,
   onNewRound,
+  onAddPenalty,
 }: ActiveGameScreenProps) {
   const { width } = useWindowDimensions();
   const stacked = width < 380;
@@ -123,6 +133,16 @@ export function ActiveGameScreen({
             <TeamCard team={game.teams[1]} stacked={stacked} />
           </View>
 
+          {game.lastAction ? (
+            <View style={styles.lastActionCard}>
+              <Text style={styles.lastActionTitle}>Son işlem</Text>
+              <Text style={styles.lastActionLine}>
+                {game.lastAction.playerName} · {game.lastAction.penaltyLabel} +
+                {game.lastAction.amount}
+              </Text>
+            </View>
+          ) : null}
+
           {lastRound ? (
             <View style={styles.lastRoundCard}>
               <Text style={styles.lastRoundTitle}>
@@ -143,6 +163,11 @@ export function ActiveGameScreen({
         </ScrollView>
 
         <View style={styles.footer}>
+          <SecondaryButton
+            label="Ceza Ekle"
+            onPress={onAddPenalty}
+            style={styles.penaltyButton}
+          />
           <PrimaryButton label="Yeni El" onPress={onNewRound} />
         </View>
       </View>
@@ -275,6 +300,22 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text,
   },
+  lastActionCard: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  lastActionTitle: {
+    ...typography.infoLabel,
+    color: colors.primary,
+  },
+  lastActionLine: {
+    ...typography.buttonSecondary,
+    color: colors.text,
+  },
   warning: {
     ...typography.infoLabel,
     color: colors.textSecondary,
@@ -287,5 +328,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.background,
+    gap: spacing.sm,
+  },
+  penaltyButton: {
+    flexGrow: 0,
+    flexShrink: 0,
+    width: '100%',
   },
 });

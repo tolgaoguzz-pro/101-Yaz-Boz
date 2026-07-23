@@ -4,15 +4,27 @@ import { StatusBar } from 'expo-status-bar';
 import { CalculateRoundResult } from './src/engine/calculateRound';
 import {
   ActiveGameData,
+  ActiveGamePlayer,
   ActiveGameScreen,
+  ActiveGameTeam,
+  LastGameAction,
   SavedRoundSummary,
 } from './src/ui/screens/ActiveGameScreen';
 import { HomeScreen } from './src/ui/screens/HomeScreen';
 import { NewGameScreen } from './src/ui/screens/NewGameScreen';
+import {
+  QuickPenaltyScreen,
+  QuickPenaltySelection,
+} from './src/ui/screens/QuickPenaltyScreen';
 import { RoundEntryScreen } from './src/ui/screens/RoundEntryScreen';
 import { PLAYER_IDS, TEAM_IDS } from './src/ui/gameRoster';
 
-type Screen = 'home' | 'newGame' | 'activeGame' | 'roundEntry';
+type Screen =
+  | 'home'
+  | 'newGame'
+  | 'activeGame'
+  | 'roundEntry'
+  | 'quickPenalty';
 
 /** Geçici aktif oyun state’i (UI katmanı; henüz kalıcı değil). */
 type TemporaryActiveGame = ActiveGameData;
@@ -24,6 +36,55 @@ function scoreById(
 ): number {
   const found = entries.find((entry) => entry[idKey] === id);
   return found?.score ?? 0;
+}
+
+function withUpdatedPlayerScore(
+  player: ActiveGamePlayer,
+  playerId: string,
+  amount: number,
+): ActiveGamePlayer {
+  if (player.id !== playerId) {
+    return player;
+  }
+  return {
+    ...player,
+    totalScore: player.totalScore + amount,
+  };
+}
+
+function applyPenaltyToGame(
+  game: TemporaryActiveGame,
+  selection: QuickPenaltySelection,
+): TemporaryActiveGame {
+  const lastAction: LastGameAction = {
+    playerName: selection.playerName,
+    penaltyLabel: selection.label,
+    amount: selection.amount,
+  };
+
+  const teams = game.teams.map((team): ActiveGameTeam => {
+    const hasPlayer = team.players.some(
+      (player) => player.id === selection.playerId,
+    );
+    if (!hasPlayer) {
+      return team;
+    }
+
+    return {
+      name: team.name,
+      totalScore: team.totalScore + selection.amount,
+      players: [
+        withUpdatedPlayerScore(team.players[0], selection.playerId, selection.amount),
+        withUpdatedPlayerScore(team.players[1], selection.playerId, selection.amount),
+      ],
+    };
+  });
+
+  return {
+    ...game,
+    lastAction,
+    teams: [teams[0], teams[1]],
+  };
 }
 
 function applyRoundResultToGame(
@@ -55,6 +116,7 @@ function applyRoundResultToGame(
   return {
     roundNumber: game.roundNumber + 1,
     rounds: [...game.rounds, savedRound],
+    lastAction: null,
     teams: [
       {
         name: team1.name,
@@ -129,6 +191,16 @@ export default function App() {
     setScreen('activeGame');
   }
 
+  function handleApplyPenalty(selection: QuickPenaltySelection) {
+    setActiveGame((current) => {
+      if (!current) {
+        return current;
+      }
+      return applyPenaltyToGame(current, selection);
+    });
+    setScreen('activeGame');
+  }
+
   return (
     <>
       {screen === 'home' ? (
@@ -149,6 +221,7 @@ export default function App() {
           game={activeGame}
           onHome={handleHome}
           onNewRound={() => setScreen('roundEntry')}
+          onAddPenalty={() => setScreen('quickPenalty')}
         />
       ) : null}
       {screen === 'roundEntry' && activeGame ? (
@@ -156,6 +229,13 @@ export default function App() {
           game={activeGame}
           onBack={() => setScreen('activeGame')}
           onSaveRound={handleSaveRound}
+        />
+      ) : null}
+      {screen === 'quickPenalty' && activeGame ? (
+        <QuickPenaltyScreen
+          game={activeGame}
+          onBack={() => setScreen('activeGame')}
+          onApply={handleApplyPenalty}
         />
       ) : null}
       <StatusBar style="dark" />

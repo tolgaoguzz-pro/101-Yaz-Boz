@@ -67,6 +67,7 @@ export function NewGameScreen({ onBack, onStart }: NewGameScreenProps) {
     const game: ActiveGameData = {
       roundNumber: 1,
       rounds: [],
+      lastAction: null,
       teams: [
         {
           name: form.team1Name.trim(),
