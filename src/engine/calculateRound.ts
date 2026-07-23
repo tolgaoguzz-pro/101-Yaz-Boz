@@ -1,5 +1,5 @@
 import { PlayerRoundInput, RoundInput } from './models';
-import { OpenBaseRules, ScoreRules } from './rules';
+import { HandExtrasRules, OpenBaseRules, ScoreRules } from './rules';
 
 export type PlayerRoundScore = {
   playerId: string;
@@ -26,6 +26,25 @@ function basePenalty(
   }
 }
 
+function handExtrasPenalty(
+  player: PlayerRoundInput,
+  handExtras: HandExtrasRules,
+): number {
+  return (
+    player.remainingOkeyCount * handExtras.okeyPenalty +
+    player.wrongOpenCount * handExtras.wrongOpenPenalty +
+    player.playableTileDiscardCount * handExtras.playableTileDiscardPenalty +
+    player.manualPenalty
+  );
+}
+
+function playerScore(player: PlayerRoundInput, rules: ScoreRules): number {
+  return (
+    basePenalty(player, rules.openBase) +
+    handExtrasPenalty(player, rules.handExtras)
+  );
+}
+
 function normalFinishTeamBonus(
   finishType: RoundInput['finish']['finishType'],
   rules: ScoreRules,
@@ -43,7 +62,7 @@ export function calculateRound(
 ): CalculateRoundResult {
   const players = input.players.map((player) => ({
     playerId: player.playerId,
-    score: basePenalty(player, rules.openBase),
+    score: playerScore(player, rules),
   }));
 
   return {
