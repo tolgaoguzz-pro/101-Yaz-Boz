@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -92,6 +93,7 @@ export function NewGameScreen({ onBack, onStart }: NewGameScreenProps) {
   }
 
   function handleStart() {
+    Keyboard.dismiss();
     const input = {
       ...form,
       gameMode,
@@ -118,6 +120,7 @@ export function NewGameScreen({ onBack, onStart }: NewGameScreenProps) {
         <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
         >
           <Pressable

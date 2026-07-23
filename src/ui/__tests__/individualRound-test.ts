@@ -201,7 +201,10 @@ describe('applyRoundResultToIndividualGame', () => {
       normalFinishInput('player-1'),
       game,
     );
-    const next = applyRoundResultToIndividualGame(game, result);
+    const next = applyRoundResultToIndividualGame(game, result, {
+      finishType: 'normal',
+      finisherPlayerId: 'player-1',
+    });
 
     expect(next.teams[0].players[0].totalScore).toBe(
       0 + DEFAULT_SCORE_RULES.finishTeamBonus.normal,
@@ -217,7 +220,10 @@ describe('applyRoundResultToIndividualGame', () => {
       normalFinishInput('player-1'),
       game,
     );
-    const next = applyRoundResultToIndividualGame(game, result);
+    const next = applyRoundResultToIndividualGame(game, result, {
+      finishType: 'normal',
+      finisherPlayerId: 'player-1',
+    });
 
     expect(next.teams[0].totalScore).toBe(
       next.teams[0].players[0].totalScore +
@@ -235,7 +241,10 @@ describe('applyRoundResultToIndividualGame', () => {
       normalFinishInput('player-1'),
       game,
     );
-    const next = applyRoundResultToIndividualGame(game, result);
+    const next = applyRoundResultToIndividualGame(game, result, {
+      finishType: 'normal',
+      finisherPlayerId: 'player-1',
+    });
     expect(next.rounds[0].players).toHaveLength(4);
     expect(next.rounds[0].gameMode).toBe('individual');
     expect(next.rounds[0].finishBonusPlayerId).toBe('player-1');
@@ -283,10 +292,17 @@ describe('mode-aware dispatch and paired compatibility', () => {
       DEFAULT_SCORE_RULES,
       buildRosterFromActiveGame(game),
     );
-    const next = applyRoundResultToGame(game, result);
+    const next = applyRoundResultToGame(game, result, {
+      finishType: 'normal',
+      finisherPlayerId: 'player-1',
+    });
     const pairedNext = applyRoundResultToPairedGame(
       { ...pairedGame(), gameMode: undefined },
       result,
+      {
+        finishType: 'normal',
+        finisherPlayerId: 'player-1',
+      },
     );
     expect(next.teams).toEqual(pairedNext.teams);
     expect(next.rounds[0].players).toEqual(pairedNext.rounds[0].players);
@@ -309,9 +325,20 @@ describe('mode-aware dispatch and paired compatibility', () => {
       normalFinishInput('player-2'),
       game,
     );
-    const viaDispatch = applyRoundResultToGame(game, result);
-    const viaDirect = applyRoundResultToIndividualGame(game, result);
-    expect(viaDispatch).toEqual(viaDirect);
+    const viaDispatch = applyRoundResultToGame(game, result, {
+      finishType: 'normal',
+      finisherPlayerId: 'player-2',
+    });
+    const viaDirect = applyRoundResultToIndividualGame(game, result, {
+      finishType: 'normal',
+      finisherPlayerId: 'player-2',
+    });
+    expect(viaDispatch.teams).toEqual(viaDirect.teams);
+    expect(viaDispatch.rounds).toEqual(viaDirect.rounds);
+    expect(viaDispatch.activityLog).toHaveLength(1);
+    expect(viaDirect.activityLog).toHaveLength(1);
+    expect(viaDispatch.activityLog?.[0].type).toBe('round');
+    expect(viaDirect.activityLog?.[0].type).toBe('round');
 
     const penaltyNext = applyQuickPenaltyToGame(
       game,

@@ -6,7 +6,14 @@ import { CalculateRoundResult } from './src/engine/calculateRound';
 import {
   applyQuickPenaltyToGame,
   applyRoundResultToGame,
+  RoundSaveMeta,
 } from './src/ui/applyGameUpdates';
+import {
+  finishGameEarly,
+  pauseGame,
+  restartGame,
+  resumeGame,
+} from './src/ui/gameLifecycle';
 import {
   createRematchGame,
   isGameComplete,
@@ -61,12 +68,22 @@ export default function App() {
     setScreen('home');
   }
 
-  function handleSaveRound(result: CalculateRoundResult) {
+  function handleContinue() {
+    if (continuableGame?.status === 'paused') {
+      updateActiveGame((current) => resumeGame(current));
+    }
+    setScreen('activeGame');
+  }
+
+  function handleSaveRound(
+    result: CalculateRoundResult,
+    meta: RoundSaveMeta,
+  ) {
     if (!activeGame) {
       return;
     }
 
-    const nextGame = applyRoundResultToGame(activeGame, result);
+    const nextGame = applyRoundResultToGame(activeGame, result, meta);
     commitActiveGame(nextGame);
     setScreen(isGameComplete(nextGame) ? 'gameResult' : 'activeGame');
   }
@@ -91,13 +108,39 @@ export default function App() {
     setScreen('newGame');
   }
 
+  function handlePause() {
+    updateActiveGame((current) => pauseGame(current));
+    setScreen('home');
+  }
+
+  function handleFinishEarly() {
+    updateActiveGame((current) => finishGameEarly(current));
+    setScreen('gameResult');
+  }
+
+  function handleAbandonFromActive() {
+    commitActiveGame(null);
+    setScreen('home');
+  }
+
+  function handleRestartFromHome() {
+    updateActiveGame((current) => restartGame(current));
+    setScreen('activeGame');
+  }
+
+  function handleAbandonFromHome() {
+    commitActiveGame(null);
+  }
+
   return (
     <>
       {screen === 'home' ? (
         <HomeScreen
           activeGame={continuableGame}
-          onContinue={() => setScreen('activeGame')}
+          onContinue={handleContinue}
           onNewGame={handleNewGameFromHome}
+          onRestart={handleRestartFromHome}
+          onAbandon={handleAbandonFromHome}
         />
       ) : null}
       {screen === 'newGame' ? (
@@ -112,6 +155,9 @@ export default function App() {
           onHome={handleHome}
           onNewRound={() => setScreen('roundEntry')}
           onAddPenalty={() => setScreen('quickPenalty')}
+          onPause={handlePause}
+          onFinishEarly={handleFinishEarly}
+          onAbandon={handleAbandonFromActive}
         />
       ) : null}
       {screen === 'roundEntry' && continuableGame ? (

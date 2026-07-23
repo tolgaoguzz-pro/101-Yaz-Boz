@@ -11,6 +11,7 @@ export function AppTextField({ label, style, ...props }: AppTextFieldProps) {
     <View style={styles.wrap}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
+        selectTextOnFocus
         {...props}
         placeholderTextColor={colors.textSecondary}
         style={[styles.input, style]}

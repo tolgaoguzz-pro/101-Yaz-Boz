@@ -1,4 +1,5 @@
 import {
+  Alert,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -10,12 +11,15 @@ import {
 import { useMemo } from 'react';
 
 import type { GameMode } from '../gameMode';
+import type { FinishType } from '../../engine/models';
+import type { GameActivityEvent, GameStatus } from '../gameActivity';
 import { resolveGameMode } from '../gameMode';
 import { TEAM_IDS } from '../gameRoster';
 import {
   rankPlayersByPenaltyAscending,
   rosterPlayersInOrder,
 } from '../gameResult';
+import { resolveActivityLog } from '../gameLifecycle';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SecondaryButton } from '../components/SecondaryButton';
 import {
@@ -23,6 +27,9 @@ import {
   resolveTargetRoundCount,
 } from '../targetRoundCount';
 import { colors, radii, spacing, typography } from '../theme';
+
+export type { GameStatus } from '../gameActivity';
+export type { GameActivityEvent } from '../gameActivity';
 
 export type ActiveGamePlayer = {
   id: string;
@@ -41,10 +48,10 @@ export type SavedRoundSummary = {
   players: { playerId: string; score: number }[];
   teams: { teamId: string; score: number }[];
   finishTeamBonus: { teamId: string | null; amount: number };
-  /** El kaydındaki oyun modu (eski kayıtlarda yok). */
   gameMode?: GameMode;
-  /** Tekli: bitiş bonusunun uygulandığı oyuncu. */
   finishBonusPlayerId?: string | null;
+  finishType?: FinishType;
+  finisherPlayerId?: string | null;
 };
 
 export type LastGameAction = {
@@ -55,20 +62,17 @@ export type LastGameAction = {
 
 export type ActiveGameData = {
   teams: [ActiveGameTeam, ActiveGameTeam];
-  /** Bir sonraki oynanacak el numarası. */
   roundNumber: number;
   rounds: SavedRoundSummary[];
   lastAction: LastGameAction | null;
-  /**
-   * Planlanan toplam el sayısı.
-   * Yeni oyunlarda zorunlu kaydedilir; eski state için opsiyonel fallback kullanılır.
-   */
   targetRoundCount?: number;
-  /**
-   * paired = eşli, individual = tekli.
-   * Yeni oyunlarda zorunlu; eski snapshot’ta yoksa paired.
-   */
   gameMode?: GameMode;
+  status?: GameStatus;
+  startedAt?: string;
+  updatedAt?: string;
+  completedAt?: string;
+  pausedAt?: string;
+  activityLog?: GameActivityEvent[];
 };
 
 type ActiveGameScreenProps = {
@@ -76,19 +80,23 @@ type ActiveGameScreenProps = {
   onHome: () => void;
   onNewRound: () => void;
   onAddPenalty: () => void;
+  onPause: () => void;
+  onFinishEarly: () => void;
+  onAbandon: () => void;
 };
 
 function scoreByPlayerId(
-  round: SavedRoundSummary,
+  scores: { playerId: string; score: number }[],
   playerId: string,
 ): number {
-  return (
-    round.players.find((player) => player.playerId === playerId)?.score ?? 0
-  );
+  return scores.find((player) => player.playerId === playerId)?.score ?? 0;
 }
 
-function scoreByTeamId(round: SavedRoundSummary, teamId: string): number {
-  return round.teams.find((team) => team.teamId === teamId)?.score ?? 0;
+function scoreByTeamId(
+  scores: { teamId: string; score: number }[],
+  teamId: string,
+): number {
+  return scores.find((team) => team.teamId === teamId)?.score ?? 0;
 }
 
 function TeamCard({
@@ -145,75 +153,83 @@ function IndividualStandingsCard({ game }: { game: ActiveGameData }) {
   );
 }
 
-function RoundHistoryItem({
-  round,
+function ActivityLogItem({
+  event,
   game,
   isLatest,
-  showDivider,
   isIndividual,
 }: {
-  round: SavedRoundSummary;
+  event: GameActivityEvent;
   game: ActiveGameData;
   isLatest: boolean;
-  showDivider: boolean;
   isIndividual: boolean;
 }) {
   const rosterPlayers = rosterPlayersInOrder(game);
-  const bonusPlayer = round.finishBonusPlayerId
-    ? rosterPlayers.find((player) => player.id === round.finishBonusPlayerId)
+
+  if (event.type === 'penalty') {
+    return (
+      <View style={[styles.roundBlock, isLatest && styles.roundBlockLatest]}>
+        <Text style={styles.roundTitle}>Ceza</Text>
+        <Text style={styles.historyName}>
+          {event.playerName} · {event.penaltyLabel} +{event.amount}
+        </Text>
+        <Text style={styles.bonusLine}>
+          #{event.sequence} ·{' '}
+          {new Date(event.createdAt).toLocaleString('tr-TR')}
+        </Text>
+      </View>
+    );
+  }
+
+  const bonusPlayer = event.finishBonusPlayerId
+    ? rosterPlayers.find((player) => player.id === event.finishBonusPlayerId)
     : null;
 
   return (
-    <View>
-      <View style={[styles.roundBlock, isLatest && styles.roundBlockLatest]}>
-        <Text style={styles.roundTitle}>El {round.roundNumber}</Text>
-
-        <View style={styles.roundScores}>
-          {rosterPlayers.map((player) => (
-            <View key={player.id} style={styles.historyRow}>
+    <View style={[styles.roundBlock, isLatest && styles.roundBlockLatest]}>
+      <Text style={styles.roundTitle}>{event.roundNumber}. El</Text>
+      <View style={styles.roundScores}>
+        {rosterPlayers.map((player) => (
+          <View key={player.id} style={styles.historyRow}>
+            <Text style={styles.historyName} numberOfLines={1}>
+              {player.name}
+            </Text>
+            <Text style={styles.historyScore}>
+              {scoreByPlayerId(event.playerScores, player.id)}
+            </Text>
+          </View>
+        ))}
+      </View>
+      {isIndividual ? (
+        event.finishBonusAmount !== 0 ? (
+          <Text style={styles.bonusLine}>
+            Bitiş bonusu · {bonusPlayer?.name ?? 'Bitiren'}{' '}
+            {event.finishBonusAmount}
+          </Text>
+        ) : null
+      ) : (
+        <>
+          <Text style={styles.teamTotalLabel}>Takım Toplamı:</Text>
+          <View style={styles.roundScores}>
+            <View style={styles.historyRow}>
               <Text style={styles.historyName} numberOfLines={1}>
-                {player.name}
+                {game.teams[0].name}
               </Text>
               <Text style={styles.historyScore}>
-                {scoreByPlayerId(round, player.id)}
+                {scoreByTeamId(event.teamScores, TEAM_IDS.team1)}
               </Text>
             </View>
-          ))}
-        </View>
-
-        {isIndividual ? (
-          round.finishBonusPlayerId &&
-          round.finishTeamBonus.amount !== 0 ? (
-            <Text style={styles.bonusLine}>
-              Bitiş bonusu · {bonusPlayer?.name ?? 'Bitiren'}{' '}
-              {round.finishTeamBonus.amount}
-            </Text>
-          ) : null
-        ) : (
-          <>
-            <Text style={styles.teamTotalLabel}>Takım Toplamı:</Text>
-            <View style={styles.roundScores}>
-              <View style={styles.historyRow}>
-                <Text style={styles.historyName} numberOfLines={1}>
-                  {game.teams[0].name}
-                </Text>
-                <Text style={styles.historyScore}>
-                  {scoreByTeamId(round, TEAM_IDS.team1)}
-                </Text>
-              </View>
-              <View style={styles.historyRow}>
-                <Text style={styles.historyName} numberOfLines={1}>
-                  {game.teams[1].name}
-                </Text>
-                <Text style={styles.historyScore}>
-                  {scoreByTeamId(round, TEAM_IDS.team2)}
-                </Text>
-              </View>
+            <View style={styles.historyRow}>
+              <Text style={styles.historyName} numberOfLines={1}>
+                {game.teams[1].name}
+              </Text>
+              <Text style={styles.historyScore}>
+                {scoreByTeamId(event.teamScores, TEAM_IDS.team2)}
+              </Text>
             </View>
-          </>
-        )}
-      </View>
-      {showDivider ? <View style={styles.roundDivider} /> : null}
+          </View>
+        </>
+      )}
     </View>
   );
 }
@@ -223,99 +239,137 @@ export function ActiveGameScreen({
   onHome,
   onNewRound,
   onAddPenalty,
+  onPause,
+  onFinishEarly,
+  onAbandon,
 }: ActiveGameScreenProps) {
   const { width } = useWindowDimensions();
   const stacked = width < 380;
   const isIndividual = resolveGameMode(game.gameMode) === 'individual';
   const playedRounds = game.rounds.length;
-  const lastRoundIndex = playedRounds - 1;
   const targetRounds = resolveTargetRoundCount(game.targetRoundCount);
   const roundsLeft = remainingRoundCount(playedRounds, targetRounds);
+  const activityLog = useMemo(() => resolveActivityLog(game), [game]);
+  const lastIndex = activityLog.length - 1;
+
+  function confirmFinishEarly() {
+    Alert.alert(
+      'Oyunu bitir',
+      'Oyun planlanan el sayısına ulaşmadan bitirilecek. Devam edilsin mi?',
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Bitir', style: 'destructive', onPress: onFinishEarly },
+      ],
+    );
+  }
+
+  function confirmAbandon() {
+    Alert.alert(
+      'Oyunu iptal et',
+      'Bu oyun silinir ve sonuç sayılmaz. Emin misin?',
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'İptal Et', style: 'destructive', onPress: onAbandon },
+      ],
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.shell}>
-        <View style={styles.fixedTop}>
-          <View style={styles.topBar}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={onHome}
-              style={({ pressed }) => [
-                styles.homeButton,
-                pressed && styles.homePressed,
-              ]}
-            >
-              <Text style={styles.homeLabel}>Ana Sayfa</Text>
-            </Pressable>
-            <Text style={styles.brand}>101 YAZ-BOZ</Text>
-          </View>
-
-          <View style={styles.header}>
-            <Text style={styles.title}>Aktif Oyun</Text>
-            <View style={styles.roundMeta}>
-              <Text style={styles.roundInfo}>
-                Oynanan El: {playedRounds} / {targetRounds}
-              </Text>
-              <Text style={styles.roundInfo}>Kalan El: {roundsLeft}</Text>
-            </View>
-          </View>
-
-          {isIndividual ? (
-            <IndividualStandingsCard game={game} />
-          ) : (
-            <View style={[styles.teamsRow, stacked && styles.teamsColumn]}>
-              <TeamCard team={game.teams[0]} stacked={stacked} />
-              <TeamCard team={game.teams[1]} stacked={stacked} />
-            </View>
-          )}
-
-          {game.lastAction ? (
-            <View style={styles.lastActionCard}>
-              <Text style={styles.lastActionTitle}>Son işlem</Text>
-              <Text style={styles.lastActionLine}>
-                {game.lastAction.playerName} · {game.lastAction.penaltyLabel} +
-                {game.lastAction.amount}
-              </Text>
-            </View>
-          ) : null}
-
-          <Text style={styles.historyHeading}>El Geçmişi</Text>
+      <ScrollView
+        style={styles.shell}
+        contentContainerStyle={styles.pageContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.topBar}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onHome}
+            style={({ pressed }) => [
+              styles.homeButton,
+              pressed && styles.homePressed,
+            ]}
+          >
+            <Text style={styles.homeLabel}>Ana Sayfa</Text>
+          </Pressable>
+          <Text style={styles.brand}>101 YAZ-BOZ</Text>
         </View>
 
-        <ScrollView
-          style={styles.historyScroll}
-          contentContainerStyle={styles.historyContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {playedRounds === 0 ? (
-            <Text style={styles.emptyHistory}>Henüz el oynanmadı</Text>
-          ) : (
-            game.rounds.map((round, index) => (
-              <RoundHistoryItem
-                key={`round-${round.roundNumber}-${index}`}
-                round={round}
+        <View style={styles.header}>
+          <Text style={styles.title}>Aktif Oyun</Text>
+          <View style={styles.roundMeta}>
+            <Text style={styles.roundInfo}>
+              Oynanan El: {playedRounds} / {targetRounds}
+            </Text>
+            <Text style={styles.roundInfo}>Kalan El: {roundsLeft}</Text>
+          </View>
+        </View>
+
+        {isIndividual ? (
+          <IndividualStandingsCard game={game} />
+        ) : (
+          <View style={[styles.teamsRow, stacked && styles.teamsColumn]}>
+            <TeamCard team={game.teams[0]} stacked={stacked} />
+            <TeamCard team={game.teams[1]} stacked={stacked} />
+          </View>
+        )}
+
+        {game.lastAction ? (
+          <View style={styles.lastActionCard}>
+            <Text style={styles.lastActionTitle}>Son işlem</Text>
+            <Text style={styles.lastActionLine}>
+              {game.lastAction.playerName} · {game.lastAction.penaltyLabel} +
+              {game.lastAction.amount}
+            </Text>
+          </View>
+        ) : null}
+
+        <Text style={styles.historyHeading}>Oyun Günlüğü</Text>
+        {activityLog.length === 0 ? (
+          <Text style={styles.emptyHistory}>Henüz işlem yok</Text>
+        ) : (
+          <View style={styles.logList}>
+            {activityLog.map((event, index) => (
+              <ActivityLogItem
+                key={event.id}
+                event={event}
                 game={game}
-                isLatest={index === lastRoundIndex}
-                showDivider={index < lastRoundIndex}
+                isLatest={index === lastIndex}
                 isIndividual={isIndividual}
               />
-            ))
-          )}
+            ))}
+          </View>
+        )}
 
-          <Text style={styles.warning}>
-            Aktif oyun bu cihazda otomatik kaydedilir.
-          </Text>
-        </ScrollView>
-
-        <View style={styles.footer}>
+        <View style={styles.actionsBlock}>
           <SecondaryButton
             label="Ceza Ekle"
             onPress={onAddPenalty}
-            style={styles.penaltyButton}
+            style={styles.fullButton}
           />
           <PrimaryButton label="Yeni El" onPress={onNewRound} />
         </View>
-      </View>
+
+        <View style={styles.lifecycleBlock}>
+          <Text style={styles.historyHeading}>Oyun İşlemleri</Text>
+          <Pressable onPress={onPause} style={styles.linkButton}>
+            <Text style={styles.linkLabel}>Oyunu Durdur</Text>
+          </Pressable>
+          <Pressable onPress={confirmFinishEarly} style={styles.linkButton}>
+            <Text style={styles.linkLabel}>Oyunu Bitir</Text>
+          </Pressable>
+          <Pressable onPress={confirmAbandon} style={styles.linkButton}>
+            <Text style={[styles.linkLabel, styles.dangerLabel]}>
+              Oyunu İptal Et
+            </Text>
+          </Pressable>
+        </View>
+
+        <Text style={styles.warning}>
+          Aktif oyun bu cihazda otomatik kaydedilir.
+        </Text>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -328,9 +382,10 @@ const styles = StyleSheet.create({
   shell: {
     flex: 1,
   },
-  fixedTop: {
+  pageContent: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
+    paddingBottom: spacing.xxl,
     gap: spacing.md,
   },
   topBar: {
@@ -388,11 +443,6 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 3,
     gap: spacing.sm,
   },
   teamCardSide: {
@@ -480,20 +530,14 @@ const styles = StyleSheet.create({
     ...typography.buttonSecondary,
     color: colors.primary,
   },
-  historyScroll: {
-    flex: 1,
-    marginTop: spacing.sm,
-  },
-  historyContent: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    gap: spacing.sm,
-  },
   emptyHistory: {
     ...typography.body,
     color: colors.textSecondary,
     textAlign: 'center',
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md,
+  },
+  logList: {
+    gap: spacing.sm,
   },
   roundBlock: {
     gap: 4,
@@ -550,30 +594,33 @@ const styles = StyleSheet.create({
     color: colors.primaryMuted,
     marginTop: 4,
   },
-  roundDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.border,
+  actionsBlock: {
+    gap: spacing.sm,
     marginTop: spacing.sm,
-    marginBottom: spacing.xs,
+  },
+  fullButton: {
+    flexGrow: 0,
+    width: '100%',
+  },
+  lifecycleBlock: {
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  linkButton: {
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  linkLabel: {
+    ...typography.buttonSecondary,
+    color: colors.primary,
+  },
+  dangerLabel: {
+    color: '#8B2E2E',
   },
   warning: {
     ...typography.infoLabel,
     color: colors.textSecondary,
     textAlign: 'center',
     marginTop: spacing.md,
-  },
-  footer: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.background,
-    gap: spacing.sm,
-  },
-  penaltyButton: {
-    flexGrow: 0,
-    flexShrink: 0,
-    width: '100%',
   },
 });

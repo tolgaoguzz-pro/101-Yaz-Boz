@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
+  Keyboard,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -119,6 +120,7 @@ export function QuickPenaltyScreen({
   const selectedPlayer = players.find((player) => player.id === playerId);
 
   function handleApply() {
+    Keyboard.dismiss();
     if (!canSubmit || playerId === null || kind === null) {
       return;
     }
@@ -196,6 +198,7 @@ export function QuickPenaltyScreen({
               <TextInput
                 keyboardType="number-pad"
                 value={manualText}
+                selectTextOnFocus
                 onChangeText={setManualText}
                 onBlur={() =>
                   setManualText(String(amountForKind('manual', manualText)))

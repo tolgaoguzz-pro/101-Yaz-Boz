@@ -6,7 +6,10 @@ import {
   SavedRoundSummary,
 } from '../ui/screens/ActiveGameScreen';
 import { resolveGameMode, isGameMode } from '../ui/gameMode';
-import { isGameComplete } from '../ui/gameResult';
+import {
+  isContinuableGameStatus,
+  resolveGameStatus,
+} from '../ui/gameLifecycle';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -120,6 +123,23 @@ function parseRoundSummary(value: unknown): SavedRoundSummary | null {
     summary.finishBonusPlayerId = value.finishBonusPlayerId;
   }
 
+  if (
+    value.finishType === 'normal' ||
+    value.finishType === 'okey' ||
+    value.finishType === 'fromHand' ||
+    value.finishType === 'fromHandAndOkey' ||
+    value.finishType === 'none'
+  ) {
+    summary.finishType = value.finishType;
+  }
+
+  if (
+    value.finisherPlayerId === null ||
+    typeof value.finisherPlayerId === 'string'
+  ) {
+    summary.finisherPlayerId = value.finisherPlayerId;
+  }
+
   return summary;
 }
 
@@ -206,21 +226,57 @@ export function parseActiveGameSnapshot(
   // Eski kayıtlarda yoksa paired; geçersiz değer de paired’e düşer.
   const gameMode = resolveGameMode(parsed.gameMode);
 
-  return {
+  const statusValue = parsed.status;
+  const status =
+    statusValue === 'active' ||
+    statusValue === 'paused' ||
+    statusValue === 'completed' ||
+    statusValue === 'abandoned'
+      ? statusValue
+      : undefined;
+
+  let activityLog = undefined;
+  if (Array.isArray(parsed.activityLog)) {
+    activityLog = parsed.activityLog.filter((entry) => {
+      if (!isRecord(entry)) {
+        return false;
+      }
+      return entry.type === 'round' || entry.type === 'penalty';
+    }) as ActiveGameData['activityLog'];
+  }
+
+  const game: ActiveGameData = {
     teams: [team0, team1],
     roundNumber: parsed.roundNumber,
     rounds,
     lastAction,
     targetRoundCount,
     gameMode,
+    status,
+    activityLog,
   };
+
+  if (typeof parsed.startedAt === 'string') {
+    game.startedAt = parsed.startedAt;
+  }
+  if (typeof parsed.updatedAt === 'string') {
+    game.updatedAt = parsed.updatedAt;
+  }
+  if (typeof parsed.completedAt === 'string') {
+    game.completedAt = parsed.completedAt;
+  }
+  if (typeof parsed.pausedAt === 'string') {
+    game.pausedAt = parsed.pausedAt;
+  }
+
+  return game;
 }
 
 export function serializeActiveGameSnapshot(game: ActiveGameData): string {
   return JSON.stringify(game);
 }
 
-/** Home “Devam Et” ve DB’de tutulacak oyunlar. */
+/** Home “Devam Et” ve DB’de tutulacak oyunlar (active veya paused). */
 export function isContinuableActiveGame(game: ActiveGameData): boolean {
-  return !isGameComplete(game);
+  return isContinuableGameStatus(resolveGameStatus(game));
 }

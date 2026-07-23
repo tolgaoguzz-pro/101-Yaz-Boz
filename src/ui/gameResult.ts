@@ -188,6 +188,13 @@ function calculateIndividualWinner(
 }
 
 export function isGameComplete(game: ActiveGameData): boolean {
+  if (game.status === 'completed') {
+    return true;
+  }
+  if (game.status === 'paused' || game.status === 'abandoned') {
+    return false;
+  }
+
   const played = game.rounds?.length ?? 0;
   if (played <= 0) {
     return false;
@@ -258,12 +265,19 @@ function resetTeam(team: ActiveGameTeam): ActiveGameTeam {
  * targetRoundCount ve gameMode korunur.
  */
 export function createRematchGame(game: ActiveGameData): ActiveGameData {
+  const at = new Date().toISOString();
   return {
     teams: [resetTeam(game.teams[0]), resetTeam(game.teams[1])],
     roundNumber: 1,
     rounds: [],
+    activityLog: [],
     lastAction: null,
     targetRoundCount: resolveTargetRoundCount(game.targetRoundCount),
     gameMode: resolveGameMode(game.gameMode),
+    status: 'active',
+    startedAt: at,
+    updatedAt: at,
+    completedAt: undefined,
+    pausedAt: undefined,
   };
 }

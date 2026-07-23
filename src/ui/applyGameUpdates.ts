@@ -1,7 +1,13 @@
 import { CalculateRoundResult } from '../engine/calculateRound';
-import { resolveGameMode } from './gameMode';
+import { FinishType } from '../engine/models';
 import {
-  individualTeamIdForPlayer,
+  appendPenaltyActivity,
+  appendRoundActivity,
+  nowIso,
+} from './gameLifecycle';
+import { resolveGameMode } from './gameMode';
+import { isGameComplete } from './gameResult';
+import {
   playerIdFromIndividualTeamId,
   containerTeamScoresFromPlayers,
 } from './individualRound';
@@ -14,6 +20,11 @@ import {
   SavedRoundSummary,
 } from './screens/ActiveGameScreen';
 import { QuickPenaltySelection } from './screens/QuickPenaltyScreen';
+
+export type RoundSaveMeta = {
+  finishType: FinishType;
+  finisherPlayerId: string | null;
+};
 
 function scoreById(
   entries: { playerId?: string; teamId?: string; score: number }[],
@@ -38,20 +49,64 @@ function withUpdatedPlayerScore(
   };
 }
 
-function teamTotalFromPlayers(team: ActiveGameTeam): number {
-  return team.players[0].totalScore + team.players[1].totalScore;
-}
-
 function withRecalculatedTeamTotal(team: ActiveGameTeam): ActiveGameTeam {
   return {
     ...team,
-    totalScore: teamTotalFromPlayers(team),
+    totalScore: team.players[0].totalScore + team.players[1].totalScore,
   };
+}
+
+function finalizeAfterRound(
+  game: ActiveGameData,
+  savedRound: SavedRoundSummary,
+  result: CalculateRoundResult,
+  meta: RoundSaveMeta,
+): ActiveGameData {
+  const at = nowIso();
+  const withRound: ActiveGameData = {
+    ...game,
+    updatedAt: at,
+    lastAction: null,
+  };
+
+  const activityLog = appendRoundActivity(withRound, {
+    roundNumber: savedRound.roundNumber,
+    playerScores: savedRound.players,
+    teamScores: savedRound.teams,
+    finishType: meta.finishType,
+    finisherPlayerId: meta.finisherPlayerId,
+    finishBonusAmount: result.finishTeamBonus.amount,
+    finishBonusPlayerId: savedRound.finishBonusPlayerId ?? null,
+    finishBonusTeamId: result.finishTeamBonus.teamId,
+    gameMode: resolveGameMode(game.gameMode),
+  });
+
+  let next: ActiveGameData = {
+    ...withRound,
+    activityLog,
+  };
+
+  if (isGameComplete({ ...next, status: 'active' })) {
+    next = {
+      ...next,
+      status: 'completed',
+      completedAt: at,
+      pausedAt: undefined,
+    };
+  } else {
+    next = {
+      ...next,
+      status: 'active',
+    };
+  }
+
+  return next;
 }
 
 export function applyRoundResultToPairedGame(
   game: ActiveGameData,
   result: CalculateRoundResult,
+  meta: RoundSaveMeta,
 ): ActiveGameData {
   const playerScores = result.players.map((player) => ({
     playerId: player.playerId,
@@ -71,12 +126,14 @@ export function applyRoundResultToPairedGame(
       amount: result.finishTeamBonus.amount,
     },
     gameMode: 'paired',
+    finishType: meta.finishType,
+    finisherPlayerId: meta.finisherPlayerId,
   };
 
   const team1 = game.teams[0];
   const team2 = game.teams[1];
 
-  return {
+  const scored: ActiveGameData = {
     ...game,
     gameMode: resolveGameMode(game.gameMode),
     roundNumber: game.roundNumber + 1,
@@ -129,15 +186,14 @@ export function applyRoundResultToPairedGame(
       },
     ],
   };
+
+  return finalizeAfterRound(scored, savedRound, result, meta);
 }
 
-/**
- * Tekli: oyuncu skorları + bitiş bonusu yalnız bitirene.
- * Container team.totalScore = iki oyuncunun güncel toplamı.
- */
 export function applyRoundResultToIndividualGame(
   game: ActiveGameData,
   result: CalculateRoundResult,
+  meta: RoundSaveMeta,
 ): ActiveGameData {
   const playerScores = result.players.map((player) => ({
     playerId: player.playerId,
@@ -165,6 +221,8 @@ export function applyRoundResultToIndividualGame(
     },
     gameMode: 'individual',
     finishBonusPlayerId,
+    finishType: meta.finishType,
+    finisherPlayerId: meta.finisherPlayerId,
   };
 
   function nextPlayerTotal(player: ActiveGamePlayer): number {
@@ -198,7 +256,7 @@ export function applyRoundResultToIndividualGame(
     },
   ];
 
-  return {
+  const scored: ActiveGameData = {
     ...game,
     gameMode: 'individual',
     roundNumber: game.roundNumber + 1,
@@ -219,16 +277,25 @@ export function applyRoundResultToIndividualGame(
       },
     ],
   };
+
+  return finalizeAfterRound(scored, savedRound, result, meta);
 }
 
 export function applyRoundResultToGame(
   game: ActiveGameData,
   result: CalculateRoundResult,
+  meta: RoundSaveMeta,
 ): ActiveGameData {
   if (resolveGameMode(game.gameMode) === 'individual') {
-    return applyRoundResultToIndividualGame(game, result);
+    return applyRoundResultToIndividualGame(game, result, meta);
   }
-  return applyRoundResultToPairedGame(game, result);
+  return applyRoundResultToPairedGame(game, result, meta);
+}
+
+function penaltySource(
+  selection: QuickPenaltySelection,
+): 'fixed' | 'manual' {
+  return selection.kind === 'manual' ? 'manual' : 'fixed';
 }
 
 export function applyQuickPenaltyToPairedGame(
@@ -259,10 +326,23 @@ export function applyQuickPenaltyToPairedGame(
     };
   });
 
-  return {
+  const base: ActiveGameData = {
     ...game,
     lastAction,
     teams: [teams[0], teams[1]],
+    updatedAt: nowIso(),
+    status: game.status === 'paused' ? 'paused' : 'active',
+  };
+
+  return {
+    ...base,
+    activityLog: appendPenaltyActivity(base, {
+      playerId: selection.playerId,
+      playerName: selection.playerName,
+      penaltyLabel: selection.label,
+      amount: selection.amount,
+      source: penaltySource(selection),
+    }),
   };
 }
 
@@ -296,11 +376,24 @@ export function applyQuickPenaltyToIndividualGame(
     });
   });
 
-  return {
+  const base: ActiveGameData = {
     ...game,
     gameMode: 'individual',
     lastAction,
     teams: [teams[0], teams[1]],
+    updatedAt: nowIso(),
+    status: game.status === 'paused' ? 'paused' : 'active',
+  };
+
+  return {
+    ...base,
+    activityLog: appendPenaltyActivity(base, {
+      playerId: selection.playerId,
+      playerName: selection.playerName,
+      penaltyLabel: selection.label,
+      amount: selection.amount,
+      source: penaltySource(selection),
+    }),
   };
 }
 
@@ -313,11 +406,3 @@ export function applyQuickPenaltyToGame(
   }
   return applyQuickPenaltyToPairedGame(game, selection);
 }
-
-export function finishBonusPlayerIdFromIndividualResult(
-  result: CalculateRoundResult,
-): string | null {
-  return playerIdFromIndividualTeamId(result.finishTeamBonus.teamId);
-}
-
-export { individualTeamIdForPlayer };

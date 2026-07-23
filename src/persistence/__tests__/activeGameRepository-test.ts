@@ -100,6 +100,74 @@ describe('activeGameSnapshot', () => {
       ),
     ).toBe(false);
   });
+
+  it('round-trips status and activityLog', () => {
+    const game = makeGame({
+      status: 'paused',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T01:00:00.000Z',
+      pausedAt: '2026-01-01T01:00:00.000Z',
+      activityLog: [
+        {
+          id: 'round-1',
+          type: 'round',
+          createdAt: '2026-01-01T00:10:00.000Z',
+          sequence: 1,
+          roundNumber: 1,
+          playerScores: [
+            { playerId: 'player-1', score: 0 },
+            { playerId: 'player-2', score: 10 },
+            { playerId: 'player-3', score: 20 },
+            { playerId: 'player-4', score: 30 },
+          ],
+          teamScores: [
+            { teamId: 'team-1', score: 10 },
+            { teamId: 'team-2', score: 50 },
+          ],
+          finishType: 'normal',
+          finisherPlayerId: 'player-1',
+          finishBonusAmount: -101,
+          finishBonusTeamId: 'team-1',
+          gameMode: 'paired',
+        },
+        {
+          id: 'penalty-1',
+          type: 'penalty',
+          createdAt: '2026-01-01T00:20:00.000Z',
+          sequence: 2,
+          playerId: 'player-2',
+          playerName: 'Aygül',
+          penaltyLabel: 'Elde Okey',
+          amount: 101,
+          source: 'fixed',
+        },
+      ],
+    });
+    const parsed = parseActiveGameSnapshot(serializeActiveGameSnapshot(game));
+    expect(parsed?.status).toBe('paused');
+    expect(parsed?.activityLog).toHaveLength(2);
+    expect(isContinuableActiveGame(parsed!)).toBe(true);
+  });
+
+  it('does not treat completed or abandoned as continuable', () => {
+    expect(
+      isContinuableActiveGame(makeGame({ status: 'completed' })),
+    ).toBe(false);
+    expect(
+      isContinuableActiveGame(makeGame({ status: 'abandoned' })),
+    ).toBe(false);
+  });
+
+  it('loads legacy snapshots without status/activityLog', () => {
+    const legacy = makeGame();
+    delete legacy.status;
+    delete legacy.activityLog;
+    const parsed = parseActiveGameSnapshot(serializeActiveGameSnapshot(legacy));
+    expect(parsed).not.toBeNull();
+    expect(parsed?.status).toBeUndefined();
+    expect(parsed?.activityLog).toBeUndefined();
+    expect(isContinuableActiveGame(parsed!)).toBe(true);
+  });
 });
 
 describe('activeGameRepository (memory store)', () => {

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   SafeAreaView,
@@ -17,17 +18,14 @@ import {
   calculateRound,
 } from '../../engine/calculateRound';
 import { DEFAULT_SCORE_RULES } from '../../engine/rules';
+import { RoundSaveMeta } from '../applyGameUpdates';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { resolveGameMode } from '../gameMode';
 import {
   buildRosterFromActiveGame,
   playersFromActiveGame,
-  teamNameFromActiveGame,
 } from '../gameRoster';
-import {
-  calculateIndividualRound,
-  playerIdFromIndividualTeamId,
-} from '../individualRound';
+import { calculateIndividualRound } from '../individualRound';
 import {
   buildRoundInputFromForm,
   createInitialRoundEntryForm,
@@ -47,11 +45,15 @@ import {
 } from '../roundEntry/types';
 import { colors, radii, spacing, typography } from '../theme';
 import { ActiveGameData } from './ActiveGameScreen';
+import {
+  RoundPreviewMeta,
+  RoundPreviewScreen,
+} from './RoundPreviewScreen';
 
 type RoundEntryScreenProps = {
   game: ActiveGameData;
   onBack: () => void;
-  onSaveRound: (result: CalculateRoundResult) => void;
+  onSaveRound: (result: CalculateRoundResult, meta: RoundSaveMeta) => void;
 };
 
 const FINISH_OPTIONS: { value: RoundEntryFinishType; label: string }[] = [
@@ -113,6 +115,10 @@ export function RoundEntryScreen({
     createInitialRoundEntryForm(rosterPlayers),
   );
   const [preview, setPreview] = useState<CalculateRoundResult | null>(null);
+  const [previewMeta, setPreviewMeta] = useState<RoundPreviewMeta | null>(
+    null,
+  );
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const finishOptionsDisabled = form.finisherPlayerId === null;
@@ -123,6 +129,7 @@ export function RoundEntryScreen({
 
   function clearPreview() {
     setPreview(null);
+    setPreviewMeta(null);
     setError(null);
   }
 
@@ -195,8 +202,13 @@ export function RoundEntryScreen({
         : calculateRound(roundInput, DEFAULT_SCORE_RULES, engineRoster);
       setError(null);
       setPreview(result);
+      setPreviewMeta({
+        finishType: form.finishType,
+        finisherPlayerId: form.finisherPlayerId,
+      });
     } catch (caught) {
       setPreview(null);
+      setPreviewMeta(null);
       const message =
         caught instanceof Error
           ? caught.message
@@ -205,12 +217,13 @@ export function RoundEntryScreen({
     }
   }
 
-  function handleSave() {
+  function handleSaveFromPreview() {
     Keyboard.dismiss();
-    if (!preview) {
+    if (!preview || !previewMeta || saving) {
       return;
     }
-    onSaveRound(preview);
+    setSaving(true);
+    onSaveRound(preview, previewMeta);
   }
 
   const nameByPlayerId = useMemo(() => {
@@ -379,79 +392,11 @@ export function RoundEntryScreen({
               : null}
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
-
-            {preview ? (
-              <View style={styles.resultCard}>
-                <Text style={styles.resultTitle}>El Sonucu</Text>
-                <Text style={styles.resultHint}>
-                  {isIndividual
-                    ? 'Bitiren 0 puan alır; bitiş bonusu yalnız bitirene yazılır.'
-                    : 'Bitiren 0 puan görünür; bu normaldir.'}
-                </Text>
-                {preview.players.map((playerScore) => (
-                  <View key={playerScore.playerId} style={styles.resultRow}>
-                    <Text style={styles.resultName}>
-                      {nameByPlayerId.get(playerScore.playerId) ??
-                        playerScore.playerId}
-                    </Text>
-                    <Text style={styles.resultValue}>{playerScore.score}</Text>
-                  </View>
-                ))}
-                {isIndividual ? (
-                  preview.finishTeamBonus.amount !== 0 ? (
-                    <View style={styles.resultRow}>
-                      <Text style={styles.resultName}>
-                        Bitiş bonusu ·{' '}
-                        {nameByPlayerId.get(
-                          playerIdFromIndividualTeamId(
-                            preview.finishTeamBonus.teamId,
-                          ) ?? '',
-                        ) ?? 'Bitiren'}
-                      </Text>
-                      <Text style={styles.resultValue}>
-                        {preview.finishTeamBonus.amount}
-                      </Text>
-                    </View>
-                  ) : null
-                ) : (
-                  <>
-                    <View style={styles.resultDivider} />
-                    {preview.teams.map((teamScore) => (
-                      <View key={teamScore.teamId} style={styles.resultRow}>
-                        <Text style={styles.resultName}>
-                          {teamNameFromActiveGame(game, teamScore.teamId)}
-                        </Text>
-                        <Text style={styles.resultValue}>
-                          {teamScore.score}
-                        </Text>
-                      </View>
-                    ))}
-                    {preview.finishTeamBonus.teamId !== null ? (
-                      <View style={styles.resultRow}>
-                        <Text style={styles.resultName}>
-                          Bonus ·{' '}
-                          {teamNameFromActiveGame(
-                            game,
-                            preview.finishTeamBonus.teamId,
-                          )}
-                        </Text>
-                        <Text style={styles.resultValue}>
-                          {preview.finishTeamBonus.amount}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </>
-                )}
-              </View>
-            ) : null}
             </Pressable>
           </ScrollView>
 
           <View style={styles.footer}>
             <PrimaryButton label="Önizle" onPress={handlePreview} />
-            {preview ? (
-              <PrimaryButton label="Eli Kaydet" onPress={handleSave} />
-            ) : null}
             <Pressable
               accessibilityRole="button"
               onPress={onBack}
@@ -465,6 +410,24 @@ export function RoundEntryScreen({
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={preview !== null && previewMeta !== null}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={clearPreview}
+      >
+        {preview && previewMeta ? (
+          <RoundPreviewScreen
+            game={game}
+            result={preview}
+            meta={previewMeta}
+            saving={saving}
+            onBack={clearPreview}
+            onSave={handleSaveFromPreview}
+          />
+        ) : null}
+      </Modal>
     </SafeAreaView>
   );
 }

@@ -106,8 +106,12 @@ export function buildActiveGameFromSetup(
     gameMode,
     roundNumber: 1,
     rounds: [],
+    activityLog: [],
     lastAction: null,
     targetRoundCount: resolveTargetRoundCount(input.targetRoundCount),
+    status: 'active',
+    startedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     teams: [
       {
         name: team1Name,
