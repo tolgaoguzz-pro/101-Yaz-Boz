@@ -315,6 +315,317 @@ describe('calculateRound', () => {
     expect(teamScoreOf(result, 't2')).toBe(171);
   });
 
+  describe('critical scoring', () => {
+    it('sets the finisher score to 0 even with remaining tiles and extras', () => {
+      const result = calculateRound(
+        roundWithPlayers(
+          [
+            playerInput({
+              playerId: 'p1',
+              remainingTilePoints: 50,
+              remainingOkeyCount: 1,
+              wrongOpenCount: 1,
+              manualPenalty: 25,
+            }),
+            playerInput({ playerId: 'p2' }),
+            playerInput({ playerId: 'p3', remainingTilePoints: 10 }),
+            playerInput({ playerId: 'p4' }),
+          ],
+          { finishType: 'normal', finisherPlayerId: 'p1' },
+        ),
+        DEFAULT_SCORE_RULES,
+        roster,
+      );
+
+      expect(scoreOf(result, 'p1')).toBe(0);
+      expect(scoreOf(result, 'p2')).toBe(0);
+      expect(scoreOf(result, 'p3')).toBe(10);
+      expect(scoreOf(result, 'p4')).toBe(0);
+
+      expect(result.finishTeamBonus).toEqual({ teamId: 't1', amount: -101 });
+      expect(teamScoreOf(result, 't1')).toBe(-101);
+      expect(teamScoreOf(result, 't2')).toBe(10);
+    });
+
+    it('gives the partner fixedPenalty when penaltyMode is fixed', () => {
+      const rules: ScoreRules = {
+        ...DEFAULT_SCORE_RULES,
+        finisherPartner: { penaltyMode: 'fixed', fixedPenalty: 50 },
+      };
+
+      const result = calculateRound(
+        roundWithPlayers(
+          [
+            playerInput({ playerId: 'p1', remainingTilePoints: 99 }),
+            playerInput({ playerId: 'p2', remainingTilePoints: 40 }),
+            playerInput({ playerId: 'p3', remainingTilePoints: 10 }),
+            playerInput({ playerId: 'p4' }),
+          ],
+          { finishType: 'normal', finisherPlayerId: 'p1' },
+        ),
+        rules,
+        roster,
+      );
+
+      expect(scoreOf(result, 'p1')).toBe(0);
+      expect(scoreOf(result, 'p2')).toBe(50);
+      expect(scoreOf(result, 'p3')).toBe(10);
+      expect(scoreOf(result, 'p4')).toBe(0);
+
+      expect(result.finishTeamBonus).toEqual({ teamId: 't1', amount: -101 });
+      expect(teamScoreOf(result, 't1')).toBe(-51);
+      expect(teamScoreOf(result, 't2')).toBe(10);
+    });
+
+    it('gives the partner base plus extras without finish multiplier when penaltyMode is calculated', () => {
+      const rules: ScoreRules = {
+        ...DEFAULT_SCORE_RULES,
+        finisherPartner: { penaltyMode: 'calculated', fixedPenalty: 0 },
+      };
+
+      const result = calculateRound(
+        roundWithPlayers(
+          [
+            playerInput({ playerId: 'p1' }),
+            playerInput({
+              playerId: 'p2',
+              remainingTilePoints: 40,
+              remainingOkeyCount: 1,
+            }),
+            playerInput({ playerId: 'p3', remainingTilePoints: 20 }),
+            playerInput({ playerId: 'p4' }),
+          ],
+          { finishType: 'okey', finisherPlayerId: 'p1' },
+        ),
+        rules,
+        roster,
+      );
+
+      // partner: 40+101=141 (not ×2); opponent: 20×2=40
+      expect(scoreOf(result, 'p1')).toBe(0);
+      expect(scoreOf(result, 'p2')).toBe(141);
+      expect(scoreOf(result, 'p3')).toBe(40);
+      expect(scoreOf(result, 'p4')).toBe(0);
+
+      expect(result.finishTeamBonus).toEqual({ teamId: 't1', amount: -202 });
+      expect(teamScoreOf(result, 't1')).toBe(-61);
+      expect(teamScoreOf(result, 't2')).toBe(40);
+    });
+
+    it('produces different opponent scores for beforeFinishMultiplier vs afterFinishMultiplier', () => {
+      const players = [
+        playerInput({ playerId: 'p1' }),
+        playerInput({ playerId: 'p2' }),
+        playerInput({
+          playerId: 'p3',
+          remainingTilePoints: 50,
+          remainingOkeyCount: 1,
+        }),
+        playerInput({ playerId: 'p4', remainingTilePoints: 20 }),
+      ];
+      const finish = { finishType: 'okey' as const, finisherPlayerId: 'p1' };
+
+      const before = calculateRound(
+        roundWithPlayers(players, finish),
+        { ...DEFAULT_SCORE_RULES, extraPenaltyTiming: 'beforeFinishMultiplier' },
+        roster,
+      );
+      const after = calculateRound(
+        roundWithPlayers(players, finish),
+        { ...DEFAULT_SCORE_RULES, extraPenaltyTiming: 'afterFinishMultiplier' },
+        roster,
+      );
+
+      expect(scoreOf(before, 'p1')).toBe(0);
+      expect(scoreOf(before, 'p2')).toBe(0);
+      expect(scoreOf(before, 'p3')).toBe(302);
+      expect(scoreOf(before, 'p4')).toBe(40);
+      expect(before.finishTeamBonus).toEqual({ teamId: 't1', amount: -202 });
+      expect(teamScoreOf(before, 't1')).toBe(-202);
+      expect(teamScoreOf(before, 't2')).toBe(342);
+
+      expect(scoreOf(after, 'p1')).toBe(0);
+      expect(scoreOf(after, 'p2')).toBe(0);
+      expect(scoreOf(after, 'p3')).toBe(201);
+      expect(scoreOf(after, 'p4')).toBe(40);
+      expect(after.finishTeamBonus).toEqual({ teamId: 't1', amount: -202 });
+      expect(teamScoreOf(after, 't1')).toBe(-202);
+      expect(teamScoreOf(after, 't2')).toBe(241);
+
+      expect(scoreOf(before, 'p3')).not.toBe(scoreOf(after, 'p3'));
+    });
+
+    it('applies doubles base then okey finish multiplier for an opponent', () => {
+      const result = calculateRound(
+        roundWithPlayers(
+          [
+            playerInput({ playerId: 'p1' }),
+            playerInput({ playerId: 'p2' }),
+            playerInput({
+              playerId: 'p3',
+              openType: 'doubles',
+              remainingTilePoints: 30,
+            }),
+            playerInput({ playerId: 'p4' }),
+          ],
+          { finishType: 'okey', finisherPlayerId: 'p1' },
+        ),
+        DEFAULT_SCORE_RULES,
+        roster,
+      );
+
+      // doubles base 30×2=60, then okey ×2 → 120
+      expect(scoreOf(result, 'p1')).toBe(0);
+      expect(scoreOf(result, 'p2')).toBe(0);
+      expect(scoreOf(result, 'p3')).toBe(120);
+      expect(scoreOf(result, 'p4')).toBe(0);
+
+      expect(result.finishTeamBonus).toEqual({ teamId: 't1', amount: -202 });
+      expect(teamScoreOf(result, 't1')).toBe(-202);
+      expect(teamScoreOf(result, 't2')).toBe(120);
+    });
+
+    it('applies didNotOpenPenalty times 4 for an opponent on fromHandAndOkey finish', () => {
+      const result = calculateRound(
+        roundWithPlayers(
+          [
+            playerInput({ playerId: 'p1' }),
+            playerInput({ playerId: 'p2' }),
+            playerInput({ playerId: 'p3', openType: 'didNotOpen' }),
+            playerInput({ playerId: 'p4' }),
+          ],
+          { finishType: 'fromHandAndOkey', finisherPlayerId: 'p1' },
+        ),
+        DEFAULT_SCORE_RULES,
+        roster,
+      );
+
+      expect(scoreOf(result, 'p1')).toBe(0);
+      expect(scoreOf(result, 'p2')).toBe(0);
+      expect(scoreOf(result, 'p3')).toBe(808);
+      expect(scoreOf(result, 'p4')).toBe(0);
+
+      expect(result.finishTeamBonus).toEqual({ teamId: 't1', amount: -404 });
+      expect(teamScoreOf(result, 't1')).toBe(-404);
+      expect(teamScoreOf(result, 't2')).toBe(808);
+    });
+
+    it('adds two okeyPenalty when remainingOkeyCount is 2', () => {
+      const result = calculateRound(
+        roundWithPlayers([
+          playerInput({ playerId: 'p1', remainingOkeyCount: 2 }),
+          playerInput({ playerId: 'p2', remainingTilePoints: 5 }),
+          playerInput({ playerId: 'p3' }),
+          playerInput({ playerId: 'p4', remainingTilePoints: 7 }),
+        ]),
+        DEFAULT_SCORE_RULES,
+        roster,
+      );
+
+      expect(scoreOf(result, 'p1')).toBe(202);
+      expect(scoreOf(result, 'p2')).toBe(5);
+      expect(scoreOf(result, 'p3')).toBe(0);
+      expect(scoreOf(result, 'p4')).toBe(7);
+
+      expect(result.finishTeamBonus).toEqual({ teamId: null, amount: 0 });
+      expect(teamScoreOf(result, 't1')).toBe(207);
+      expect(teamScoreOf(result, 't2')).toBe(7);
+    });
+
+    it('sums multiple wrongOpen and playableTileDiscard penalties together', () => {
+      const result = calculateRound(
+        roundWithPlayers([
+          playerInput({
+            playerId: 'p1',
+            wrongOpenCount: 2,
+            playableTileDiscardCount: 3,
+          }),
+          playerInput({ playerId: 'p2' }),
+          playerInput({ playerId: 'p3', remainingTilePoints: 15 }),
+          playerInput({ playerId: 'p4' }),
+        ]),
+        DEFAULT_SCORE_RULES,
+        roster,
+      );
+
+      // 2×101 + 3×101 = 505
+      expect(scoreOf(result, 'p1')).toBe(505);
+      expect(scoreOf(result, 'p2')).toBe(0);
+      expect(scoreOf(result, 'p3')).toBe(15);
+      expect(scoreOf(result, 'p4')).toBe(0);
+
+      expect(result.finishTeamBonus).toEqual({ teamId: null, amount: 0 });
+      expect(teamScoreOf(result, 't1')).toBe(505);
+      expect(teamScoreOf(result, 't2')).toBe(15);
+    });
+
+    it('does not multiply manualPenalty when extraPenaltyTiming is afterFinishMultiplier', () => {
+      const rules: ScoreRules = {
+        ...DEFAULT_SCORE_RULES,
+        extraPenaltyTiming: 'afterFinishMultiplier',
+      };
+
+      const result = calculateRound(
+        roundWithPlayers(
+          [
+            playerInput({ playerId: 'p1' }),
+            playerInput({ playerId: 'p2' }),
+            playerInput({
+              playerId: 'p3',
+              remainingTilePoints: 10,
+              manualPenalty: 50,
+            }),
+            playerInput({ playerId: 'p4' }),
+          ],
+          { finishType: 'okey', finisherPlayerId: 'p1' },
+        ),
+        rules,
+        roster,
+      );
+
+      // base×2 + manual = 20+50=70 (manual not multiplied)
+      expect(scoreOf(result, 'p1')).toBe(0);
+      expect(scoreOf(result, 'p2')).toBe(0);
+      expect(scoreOf(result, 'p3')).toBe(70);
+      expect(scoreOf(result, 'p4')).toBe(0);
+
+      expect(result.finishTeamBonus).toEqual({ teamId: 't1', amount: -202 });
+      expect(teamScoreOf(result, 't1')).toBe(-202);
+      expect(teamScoreOf(result, 't2')).toBe(70);
+    });
+
+    it('computes team totals as player score sums plus finish bonus when present', () => {
+      const rules: ScoreRules = {
+        ...DEFAULT_SCORE_RULES,
+        finisherPartner: { penaltyMode: 'fixed', fixedPenalty: 25 },
+      };
+
+      const result = calculateRound(
+        roundWithPlayers(
+          [
+            playerInput({ playerId: 'p1', remainingTilePoints: 80 }),
+            playerInput({ playerId: 'p2', remainingTilePoints: 60 }),
+            playerInput({ playerId: 'p3', remainingTilePoints: 30 }),
+            playerInput({ playerId: 'p4', remainingTilePoints: 20 }),
+          ],
+          { finishType: 'normal', finisherPlayerId: 'p1' },
+        ),
+        rules,
+        roster,
+      );
+
+      expect(scoreOf(result, 'p1')).toBe(0);
+      expect(scoreOf(result, 'p2')).toBe(25);
+      expect(scoreOf(result, 'p3')).toBe(30);
+      expect(scoreOf(result, 'p4')).toBe(20);
+
+      expect(result.finishTeamBonus).toEqual({ teamId: 't1', amount: -101 });
+      // t1: 0+25+(-101)=-76; t2: 30+20=50
+      expect(teamScoreOf(result, 't1')).toBe(-76);
+      expect(teamScoreOf(result, 't2')).toBe(50);
+    });
+  });
+
   describe('validation', () => {
     const validPlayers = () => [
       playerInput({ playerId: 'p1' }),
