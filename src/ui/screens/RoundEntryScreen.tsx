@@ -28,6 +28,13 @@ import {
   parseNonNegativeNumber,
 } from '../roundEntry/buildRoundInput';
 import {
+  applyImpliedOpenTypes,
+  getPlayerCardMode,
+  getVisiblePlayerIds,
+  isHandStyleFinish,
+  shouldShowPlayerEntryCards,
+} from '../roundEntry/playerFieldRules';
+import {
   RoundEntryFinishType,
   RoundEntryForm,
   RoundEntryOpenType,
@@ -42,12 +49,6 @@ type RoundEntryScreenProps = {
   onSaveRound: (result: CalculateRoundResult) => void;
 };
 
-const OPEN_OPTIONS: { value: RoundEntryOpenType; label: string }[] = [
-  { value: 'didNotOpen', label: 'Açmadı' },
-  { value: 'series', label: 'Seri' },
-  { value: 'doubles', label: 'Çift' },
-];
-
 const FINISH_OPTIONS: { value: RoundEntryFinishType; label: string }[] = [
   { value: 'normal', label: 'Normal' },
   { value: 'okey', label: 'Okeyle' },
@@ -55,10 +56,6 @@ const FINISH_OPTIONS: { value: RoundEntryFinishType; label: string }[] = [
   { value: 'fromHandAndOkey', label: 'Elden + Okey' },
   { value: 'none', label: 'Yok' },
 ];
-
-function clampCount(value: number): number {
-  return value < 0 ? 0 : value;
-}
 
 type ChoiceChipProps = {
   label: string;
@@ -98,43 +95,6 @@ function ChoiceChip({
   );
 }
 
-type StepperProps = {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-};
-
-function Stepper({ label, value, onChange }: StepperProps) {
-  return (
-    <View style={styles.stepper}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={styles.stepperRow}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => onChange(clampCount(value - 1))}
-          style={({ pressed }) => [
-            styles.stepperButton,
-            pressed && styles.stepperButtonPressed,
-          ]}
-        >
-          <Text style={styles.stepperButtonLabel}>-</Text>
-        </Pressable>
-        <Text style={styles.stepperValue}>{value}</Text>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => onChange(value + 1)}
-          style={({ pressed }) => [
-            styles.stepperButton,
-            pressed && styles.stepperButtonPressed,
-          ]}
-        >
-          <Text style={styles.stepperButtonLabel}>+</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
 export function RoundEntryScreen({
   game,
   onBack,
@@ -150,15 +110,25 @@ export function RoundEntryScreen({
   const [error, setError] = useState<string | null>(null);
 
   const finishOptionsDisabled = form.finisherPlayerId === null;
+  const visiblePlayerIds = getVisiblePlayerIds(form);
+  const showPlayerCards = shouldShowPlayerEntryCards(form);
+  const showHandAutoNote =
+    form.finisherPlayerId !== null && isHandStyleFinish(form.finishType);
 
   function clearPreview() {
     setPreview(null);
     setError(null);
   }
 
-  function selectFinisher(playerId: string | null) {
+  function setFormAndNormalize(
+    updater: (current: RoundEntryForm) => RoundEntryForm,
+  ) {
     clearPreview();
-    setForm((current) => ({
+    setForm((current) => applyImpliedOpenTypes(updater(current)));
+  }
+
+  function selectFinisher(playerId: string | null) {
+    setFormAndNormalize((current) => ({
       ...current,
       finisherPlayerId: playerId,
       finishType:
@@ -177,21 +147,34 @@ export function RoundEntryScreen({
     if (finishType === 'none') {
       return;
     }
-    clearPreview();
-    setForm((current) => ({ ...current, finishType }));
+    setFormAndNormalize((current) => ({ ...current, finishType }));
   }
 
   function updatePlayer(
     playerId: string,
     patch: Partial<RoundEntryPlayerForm>,
   ) {
-    clearPreview();
-    setForm((current) => ({
+    setFormAndNormalize((current) => ({
       ...current,
       players: current.players.map((player) =>
         player.playerId === playerId ? { ...player, ...patch } : player,
       ),
     }));
+  }
+
+  function setOpened(playerId: string, opened: boolean) {
+    if (opened) {
+      updatePlayer(playerId, { openType: 'series' });
+      return;
+    }
+    updatePlayer(playerId, {
+      openType: 'didNotOpen',
+      remainingTilePointsText: '0',
+    });
+  }
+
+  function setOpenKind(playerId: string, openType: 'series' | 'doubles') {
+    updatePlayer(playerId, { openType });
   }
 
   function handlePreview() {
@@ -255,12 +238,7 @@ export function RoundEntryScreen({
             <Text style={styles.backLabel}>Geri</Text>
           </Pressable>
 
-          <View style={styles.header}>
-            <Text style={styles.title}>Yeni El</Text>
-            <Text style={styles.subtitle}>
-              Bitiren oyuncuyu ve el sonuçlarını gir.
-            </Text>
-          </View>
+          <Text style={styles.title}>Yeni El</Text>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Bitiren oyuncu</Text>
@@ -289,12 +267,11 @@ export function RoundEntryScreen({
                 const disabled = finishOptionsDisabled
                   ? !isNoneOption
                   : isNoneOption;
-                const selected = form.finishType === option.value;
                 return (
                   <ChoiceChip
                     key={option.value}
                     label={option.label}
-                    selected={selected}
+                    selected={form.finishType === option.value}
                     disabled={disabled}
                     onPress={() => selectFinishType(option.value)}
                   />
@@ -303,116 +280,101 @@ export function RoundEntryScreen({
             </View>
           </View>
 
-          {form.players.map((playerForm) => {
-            const playerName = nameByPlayerId.get(playerForm.playerId);
-            if (!playerName) {
-              return null;
-            }
+          {showHandAutoNote ? (
+            <View style={styles.infoCard}>
+              <Text style={styles.infoText}>
+                Elden bitiş: diğer oyuncular açmamış sayılır. Ceza otomatik
+                hesaplanır.
+              </Text>
+            </View>
+          ) : null}
 
-            return (
-              <View key={playerForm.playerId} style={styles.playerCard}>
-                <Text style={styles.playerTitle}>{playerName}</Text>
+          {showPlayerCards
+            ? visiblePlayerIds.map((playerId) => {
+                const playerForm = form.players.find(
+                  (player) => player.playerId === playerId,
+                );
+                const playerName = nameByPlayerId.get(playerId);
+                if (!playerForm || !playerName) {
+                  return null;
+                }
 
-                <Text style={styles.fieldLabel}>Açılış türü</Text>
-                <View style={styles.chipWrap}>
-                  {OPEN_OPTIONS.map((option) => (
-                    <ChoiceChip
-                      key={option.value}
-                      label={option.label}
-                      selected={playerForm.openType === option.value}
-                      onPress={() =>
-                        updatePlayer(playerForm.playerId, {
-                          openType: option.value,
-                        })
-                      }
-                    />
-                  ))}
-                </View>
+                const mode = getPlayerCardMode(form, playerId);
+                const opened = playerForm.openType !== 'didNotOpen';
 
-                <View style={styles.fieldBlock}>
-                  <Text style={styles.fieldLabel}>Kalan taş puanı</Text>
-                  <TextInput
-                    keyboardType="number-pad"
-                    value={playerForm.remainingTilePointsText}
-                    onChangeText={(value) =>
-                      updatePlayer(playerForm.playerId, {
-                        remainingTilePointsText: value,
-                      })
-                    }
-                    onBlur={() =>
-                      updatePlayer(playerForm.playerId, {
-                        remainingTilePointsText: String(
-                          parseNonNegativeNumber(
-                            playerForm.remainingTilePointsText,
-                          ),
-                        ),
-                      })
-                    }
-                    placeholderTextColor={colors.textSecondary}
-                    style={styles.input}
-                  />
-                </View>
+                return (
+                  <View key={playerId} style={styles.playerCard}>
+                    <Text style={styles.playerTitle}>{playerName}</Text>
 
-                <Stepper
-                  label="Elde kalan okey"
-                  value={playerForm.remainingOkeyCount}
-                  onChange={(value) =>
-                    updatePlayer(playerForm.playerId, {
-                      remainingOkeyCount: value,
-                    })
-                  }
-                />
-                <Stepper
-                  label="Yanlış açma"
-                  value={playerForm.wrongOpenCount}
-                  onChange={(value) =>
-                    updatePlayer(playerForm.playerId, {
-                      wrongOpenCount: value,
-                    })
-                  }
-                />
-                <Stepper
-                  label="İşlek taş cezası"
-                  value={playerForm.playableTileDiscardCount}
-                  onChange={(value) =>
-                    updatePlayer(playerForm.playerId, {
-                      playableTileDiscardCount: value,
-                    })
-                  }
-                />
+                    {mode.showOpenedChoice ? (
+                      <View style={styles.chipWrap}>
+                        <ChoiceChip
+                          label="Açtı"
+                          selected={opened}
+                          onPress={() => setOpened(playerId, true)}
+                        />
+                        <ChoiceChip
+                          label="Açmadı"
+                          selected={!opened}
+                          onPress={() => setOpened(playerId, false)}
+                        />
+                      </View>
+                    ) : null}
 
-                <View style={styles.fieldBlock}>
-                  <Text style={styles.fieldLabel}>Manuel ceza</Text>
-                  <TextInput
-                    keyboardType="number-pad"
-                    value={playerForm.manualPenaltyText}
-                    onChangeText={(value) =>
-                      updatePlayer(playerForm.playerId, {
-                        manualPenaltyText: value,
-                      })
-                    }
-                    onBlur={() =>
-                      updatePlayer(playerForm.playerId, {
-                        manualPenaltyText: String(
-                          parseNonNegativeNumber(playerForm.manualPenaltyText),
-                        ),
-                      })
-                    }
-                    placeholderTextColor={colors.textSecondary}
-                    style={styles.input}
-                  />
-                </View>
-              </View>
-            );
-          })}
+                    {mode.showSeriesDoubles ? (
+                      <View style={styles.chipWrap}>
+                        <ChoiceChip
+                          label="Seri"
+                          selected={playerForm.openType === 'series'}
+                          onPress={() => setOpenKind(playerId, 'series')}
+                        />
+                        <ChoiceChip
+                          label="Çift"
+                          selected={playerForm.openType === 'doubles'}
+                          onPress={() => setOpenKind(playerId, 'doubles')}
+                        />
+                      </View>
+                    ) : null}
+
+                    {mode.showRemainingTiles ? (
+                      <View style={styles.fieldBlock}>
+                        <Text style={styles.fieldLabel}>Kalan taş puanı</Text>
+                        <TextInput
+                          keyboardType="number-pad"
+                          value={playerForm.remainingTilePointsText}
+                          onChangeText={(value) =>
+                            updatePlayer(playerId, {
+                              remainingTilePointsText: value,
+                            })
+                          }
+                          onBlur={() =>
+                            updatePlayer(playerId, {
+                              remainingTilePointsText: String(
+                                parseNonNegativeNumber(
+                                  playerForm.remainingTilePointsText,
+                                ),
+                              ),
+                            })
+                          }
+                          placeholderTextColor={colors.textSecondary}
+                          style={styles.input}
+                        />
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })
+            : null}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
+
+          <PrimaryButton label="Önizle" onPress={handlePreview} />
 
           {preview ? (
             <View style={styles.resultCard}>
               <Text style={styles.resultTitle}>El Sonucu</Text>
               <Text style={styles.resultHint}>
-                Bitiren oyuncunun puanı 0 görünür; bu normaldir.
+                Bitiren oyuncu 0 puan görünür; bu normaldir.
               </Text>
 
               <Text style={styles.resultSectionLabel}>Oyuncular</Text>
@@ -455,7 +417,6 @@ export function RoundEntryScreen({
             </View>
           ) : null}
 
-          <PrimaryButton label="Önizle" onPress={handlePreview} />
           <PrimaryButton
             label="Eli Kaydet"
             onPress={handleSave}
@@ -488,13 +449,13 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xxl,
-    gap: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl,
+    gap: spacing.md,
   },
   backButton: {
     alignSelf: 'flex-start',
-    minHeight: 44,
+    minHeight: 40,
     paddingHorizontal: spacing.sm,
     justifyContent: 'center',
     borderRadius: radii.sm,
@@ -506,21 +467,13 @@ const styles = StyleSheet.create({
     ...typography.buttonSecondary,
     color: colors.primary,
   },
-  header: {
-    gap: spacing.sm,
-  },
   title: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '700',
-    lineHeight: 34,
     color: colors.text,
   },
-  subtitle: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
   section: {
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   sectionTitle: {
     ...typography.buttonSecondary,
@@ -532,7 +485,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   chip: {
-    minHeight: 48,
+    minHeight: 46,
     paddingHorizontal: spacing.md,
     borderRadius: radii.md,
     borderWidth: 1,
@@ -546,7 +499,7 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   chipDisabled: {
-    opacity: 0.45,
+    opacity: 0.4,
   },
   chipPressed: {
     backgroundColor: colors.surface,
@@ -561,21 +514,27 @@ const styles = StyleSheet.create({
   chipLabelDisabled: {
     color: colors.textSecondary,
   },
-  playerCard: {
+  infoCard: {
     backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
+    borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
-    gap: spacing.md,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 3,
+    padding: spacing.md,
+  },
+  infoText: {
+    ...typography.body,
+    color: colors.textSecondary,
+  },
+  playerCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.sm,
   },
   playerTitle: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: '700',
     color: colors.text,
   },
@@ -587,7 +546,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   input: {
-    minHeight: 52,
+    minHeight: 48,
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
@@ -596,38 +555,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 17,
     fontWeight: '500',
-  },
-  stepper: {
-    gap: spacing.xs,
-  },
-  stepperRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  stepperButton: {
-    width: 48,
-    height: 48,
-    borderRadius: radii.md,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepperButtonPressed: {
-    backgroundColor: colors.primaryPressed,
-  },
-  stepperButtonLabel: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.textOnPrimary,
-    lineHeight: 28,
-  },
-  stepperValue: {
-    minWidth: 36,
-    textAlign: 'center',
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text,
   },
   error: {
     ...typography.body,
@@ -640,22 +567,16 @@ const styles = StyleSheet.create({
   },
   resultCard: {
     backgroundColor: colors.surfaceElevated,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
+    borderRadius: radii.md,
+    padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
-    gap: spacing.sm,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 3,
+    gap: spacing.xs,
   },
   resultTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: colors.text,
-    marginBottom: spacing.xs,
   },
   resultHint: {
     ...typography.infoLabel,
@@ -665,7 +586,7 @@ const styles = StyleSheet.create({
   resultSectionLabel: {
     ...typography.infoLabel,
     color: colors.primary,
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
   },
   resultRow: {
     flexDirection: 'row',
@@ -683,10 +604,9 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   cancelButton: {
-    minHeight: 48,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radii.md,
   },
   cancelPressed: {
     backgroundColor: colors.surface,

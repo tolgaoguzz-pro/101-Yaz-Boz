@@ -11,10 +11,6 @@ export type RoundEntryPlayerForm = {
   playerId: string;
   openType: RoundEntryOpenType;
   remainingTilePointsText: string;
-  remainingOkeyCount: number;
-  wrongOpenCount: number;
-  playableTileDiscardCount: number;
-  manualPenaltyText: string;
 };
 
 export type RoundEntryForm = {

@@ -1,5 +1,6 @@
 import { RoundInput } from '../../engine/models';
 import { GamePlayerRef } from '../gameRoster';
+import { applyImpliedOpenTypes } from './playerFieldRules';
 import { RoundEntryForm, RoundEntryPlayerForm } from './types';
 
 export function parseNonNegativeNumber(text: string): number {
@@ -20,10 +21,6 @@ export function createInitialRoundEntryForm(
       playerId: player.id,
       openType: 'series',
       remainingTilePointsText: '0',
-      remainingOkeyCount: 0,
-      wrongOpenCount: 0,
-      playableTileDiscardCount: 0,
-      manualPenaltyText: '0',
     })),
   };
 }
@@ -33,10 +30,10 @@ function toPlayerRoundInput(player: RoundEntryPlayerForm) {
     playerId: player.playerId,
     openType: player.openType,
     remainingTilePoints: parseNonNegativeNumber(player.remainingTilePointsText),
-    remainingOkeyCount: player.remainingOkeyCount,
-    wrongOpenCount: player.wrongOpenCount,
-    playableTileDiscardCount: player.playableTileDiscardCount,
-    manualPenalty: parseNonNegativeNumber(player.manualPenaltyText),
+    remainingOkeyCount: 0,
+    wrongOpenCount: 0,
+    playableTileDiscardCount: 0,
+    manualPenalty: 0,
   };
 }
 
@@ -44,14 +41,15 @@ export function buildRoundInputFromForm(
   form: RoundEntryForm,
   roundId: string,
 ): RoundInput {
-  const nobodyFinished = form.finisherPlayerId === null;
+  const normalized = applyImpliedOpenTypes(form);
+  const nobodyFinished = normalized.finisherPlayerId === null;
 
   return {
     id: roundId,
-    players: form.players.map(toPlayerRoundInput),
+    players: normalized.players.map(toPlayerRoundInput),
     finish: {
-      finisherPlayerId: nobodyFinished ? null : form.finisherPlayerId,
-      finishType: nobodyFinished ? 'none' : form.finishType,
+      finisherPlayerId: nobodyFinished ? null : normalized.finisherPlayerId,
+      finishType: nobodyFinished ? 'none' : normalized.finishType,
     },
   };
 }
