@@ -5,7 +5,11 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import { SecondaryButton } from '../components/SecondaryButton';
 import { colors, spacing, typography } from '../theme';
 
-export function HomeScreen() {
+type HomeScreenProps = {
+  onNewGame: () => void;
+};
+
+export function HomeScreen({ onNewGame }: HomeScreenProps) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -22,10 +26,7 @@ export function HomeScreen() {
         </View>
 
         <View style={styles.actions}>
-          <PrimaryButton
-            label="Yeni Oyun"
-            onPress={() => console.log('Yeni Oyun')}
-          />
+          <PrimaryButton label="Yeni Oyun" onPress={onNewGame} />
           <View style={styles.secondaryRow}>
             <SecondaryButton
               label="Geçmiş"
