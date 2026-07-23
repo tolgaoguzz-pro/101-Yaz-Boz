@@ -35,12 +35,13 @@ type QuickPenaltyScreenProps = {
 };
 
 const PENALTY_OPTIONS: {
-  kind: Exclude<QuickPenaltyKind, 'manual'>;
+  kind: QuickPenaltyKind;
   label: string;
 }[] = [
   { kind: 'remainingOkey', label: 'Elde Okey' },
   { kind: 'wrongOpen', label: 'Yanlış Açma' },
   { kind: 'playableTileDiscard', label: 'İşlek Taş' },
+  { kind: 'manual', label: 'Manuel Ceza' },
 ];
 
 function amountForKind(kind: QuickPenaltyKind, manualText: string): number {
@@ -74,24 +75,27 @@ function labelForKind(kind: QuickPenaltyKind): string {
   }
 }
 
-type ChoiceChipProps = {
+type GridChipProps = {
   label: string;
   selected: boolean;
   onPress: () => void;
 };
 
-function ChoiceChip({ label, selected, onPress }: ChoiceChipProps) {
+function GridChip({ label, selected, onPress }: GridChipProps) {
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [
-        styles.chip,
-        selected && styles.chipSelected,
-        pressed && styles.chipPressed,
+        styles.gridChip,
+        selected && styles.gridChipSelected,
+        pressed && styles.gridChipPressed,
       ]}
     >
-      <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>
+      <Text
+        style={[styles.gridChipLabel, selected && styles.gridChipLabelSelected]}
+        numberOfLines={1}
+      >
         {label}
       </Text>
     </Pressable>
@@ -110,6 +114,7 @@ export function QuickPenaltyScreen({
 
   const amount = kind === null ? 0 : amountForKind(kind, manualText);
   const canSubmit = playerId !== null && kind !== null && amount > 0;
+  const selectedPlayer = players.find((player) => player.id === playerId);
 
   function handleApply() {
     if (!canSubmit || playerId === null || kind === null) {
@@ -130,30 +135,35 @@ export function QuickPenaltyScreen({
     });
   }
 
+  const summary =
+    selectedPlayer && kind
+      ? `${selectedPlayer.name} · ${labelForKind(kind)} +${amount}`
+      : 'Oyuncu ve ceza seç';
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.content}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={onBack}
-          style={({ pressed }) => [
-            styles.backButton,
-            pressed && styles.backPressed,
-          ]}
-        >
-          <Text style={styles.backLabel}>Geri</Text>
-        </Pressable>
+      <View style={styles.shell}>
+        <View style={styles.content}>
+          <View style={styles.topRow}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onBack}
+              style={({ pressed }) => [
+                styles.backButton,
+                pressed && styles.backPressed,
+              ]}
+            >
+              <Text style={styles.backLabel}>Geri</Text>
+            </Pressable>
+            <Text style={styles.title}>Ceza Ekle</Text>
+          </View>
 
-        <View style={styles.header}>
-          <Text style={styles.title}>Ceza Ekle</Text>
           <Text style={styles.subtitle}>Oyuncuyu ve ceza türünü seç.</Text>
-        </View>
 
-        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Oyuncu</Text>
-          <View style={styles.chipWrap}>
+          <View style={styles.grid}>
             {players.map((player) => (
-              <ChoiceChip
+              <GridChip
                 key={player.id}
                 label={player.name}
                 selected={playerId === player.id}
@@ -161,51 +171,41 @@ export function QuickPenaltyScreen({
               />
             ))}
           </View>
-        </View>
 
-        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Ceza türü</Text>
-          <View style={styles.chipWrap}>
+          <View style={styles.grid}>
             {PENALTY_OPTIONS.map((option) => (
-              <ChoiceChip
+              <GridChip
                 key={option.kind}
                 label={option.label}
                 selected={kind === option.kind}
                 onPress={() => setKind(option.kind)}
               />
             ))}
-            <ChoiceChip
-              label="Manuel Ceza"
-              selected={kind === 'manual'}
-              onPress={() => setKind('manual')}
-            />
+          </View>
+
+          {kind === 'manual' ? (
+            <View style={styles.manualRow}>
+              <Text style={styles.manualLabel}>Miktar</Text>
+              <TextInput
+                keyboardType="number-pad"
+                value={manualText}
+                onChangeText={setManualText}
+                onBlur={() =>
+                  setManualText(String(amountForKind('manual', manualText)))
+                }
+                placeholderTextColor={colors.textSecondary}
+                style={styles.manualInput}
+              />
+            </View>
+          ) : null}
+
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryText}>{summary}</Text>
           </View>
         </View>
 
-        {kind === 'manual' ? (
-          <View style={styles.fieldBlock}>
-            <Text style={styles.fieldLabel}>Manuel miktar</Text>
-            <TextInput
-              keyboardType="number-pad"
-              value={manualText}
-              onChangeText={setManualText}
-              onBlur={() =>
-                setManualText(String(amountForKind('manual', manualText)))
-              }
-              placeholderTextColor={colors.textSecondary}
-              style={styles.input}
-            />
-          </View>
-        ) : null}
-
-        {kind !== null ? (
-          <View style={styles.amountCard}>
-            <Text style={styles.amountLabel}>Eklenecek ceza</Text>
-            <Text style={styles.amountValue}>+{amount}</Text>
-          </View>
-        ) : null}
-
-        <View style={styles.actions}>
+        <View style={styles.footer}>
           <PrimaryButton
             label="Cezayı Ekle"
             onPress={handleApply}
@@ -232,16 +232,24 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  shell: {
+    flex: 1,
+  },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.lg,
-    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs,
+    gap: spacing.sm,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    minHeight: 44,
   },
   backButton: {
-    alignSelf: 'flex-start',
-    minHeight: 40,
+    minHeight: 44,
+    minWidth: 44,
     paddingHorizontal: spacing.sm,
     justifyContent: 'center',
     borderRadius: radii.sm,
@@ -253,93 +261,98 @@ const styles = StyleSheet.create({
     ...typography.buttonSecondary,
     color: colors.primary,
   },
-  header: {
-    gap: spacing.xs,
-  },
   title: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '700',
     color: colors.text,
   },
   subtitle: {
-    ...typography.body,
+    ...typography.infoLabel,
     color: colors.textSecondary,
   },
-  section: {
-    gap: spacing.xs,
-  },
   sectionTitle: {
-    ...typography.buttonSecondary,
+    fontSize: 13,
+    fontWeight: '700',
     color: colors.primary,
+    marginTop: 2,
   },
-  chipWrap: {
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.xs,
+    justifyContent: 'space-between',
+    rowGap: 8,
   },
-  chip: {
-    minHeight: 48,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.md,
+  gridChip: {
+    width: '48.5%',
+    minHeight: 52,
+    borderRadius: radii.sm,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
   },
-  chipSelected: {
+  gridChipSelected: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
-  chipPressed: {
+  gridChipPressed: {
     backgroundColor: colors.surface,
   },
-  chipLabel: {
-    ...typography.buttonSecondary,
+  gridChipLabel: {
+    fontSize: 15,
+    fontWeight: '700',
     color: colors.primary,
   },
-  chipLabelSelected: {
+  gridChipLabelSelected: {
     color: colors.textOnPrimary,
   },
-  fieldBlock: {
-    gap: spacing.xs,
+  manualRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
-  fieldLabel: {
+  manualLabel: {
     ...typography.infoLabel,
     color: colors.textSecondary,
+    minWidth: 56,
   },
-  input: {
-    minHeight: 52,
-    borderRadius: radii.md,
+  manualInput: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: radii.sm,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surfaceElevated,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
     color: colors.text,
     fontSize: 17,
-    fontWeight: '500',
+    fontWeight: '600',
   },
-  amountCard: {
+  summaryCard: {
+    marginTop: 'auto',
     backgroundColor: colors.surface,
-    borderRadius: radii.md,
+    borderRadius: radii.sm,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    minHeight: 44,
+    justifyContent: 'center',
   },
-  amountLabel: {
-    ...typography.buttonSecondary,
-    color: colors.textSecondary,
-  },
-  amountValue: {
-    fontSize: 28,
-    fontWeight: '700',
+  summaryText: {
+    fontSize: 15,
+    fontWeight: '600',
     color: colors.text,
   },
-  actions: {
-    marginTop: 'auto',
+  footer: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.background,
     gap: spacing.xs,
   },
   cancelButton: {

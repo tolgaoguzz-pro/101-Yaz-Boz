@@ -37,7 +37,6 @@ import {
 import {
   RoundEntryFinishType,
   RoundEntryForm,
-  RoundEntryOpenType,
   RoundEntryPlayerForm,
 } from '../roundEntry/types';
 import { colors, radii, spacing, typography } from '../theme';
@@ -53,7 +52,7 @@ const FINISH_OPTIONS: { value: RoundEntryFinishType; label: string }[] = [
   { value: 'normal', label: 'Normal' },
   { value: 'okey', label: 'Okeyle' },
   { value: 'fromHand', label: 'Elden' },
-  { value: 'fromHandAndOkey', label: 'Elden + Okey' },
+  { value: 'fromHandAndOkey', label: 'Elden+Okey' },
   { value: 'none', label: 'Yok' },
 ];
 
@@ -219,190 +218,182 @@ export function RoundEntryScreen({
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 4 : 0}
       >
-        <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <Pressable
-            accessibilityRole="button"
-            onPress={onBack}
-            style={({ pressed }) => [
-              styles.backButton,
-              pressed && styles.backPressed,
-            ]}
+        <View style={styles.shell}>
+          <ScrollView
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            <Text style={styles.backLabel}>Geri</Text>
-          </Pressable>
-
-          <Text style={styles.title}>Yeni El</Text>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Bitiren oyuncu</Text>
-            <View style={styles.chipWrap}>
-              {rosterPlayers.map((player) => (
-                <ChoiceChip
-                  key={player.id}
-                  label={player.name}
-                  selected={form.finisherPlayerId === player.id}
-                  onPress={() => selectFinisher(player.id)}
-                />
-              ))}
-              <ChoiceChip
-                label="Kimse Bitmedi"
-                selected={form.finisherPlayerId === null}
-                onPress={() => selectFinisher(null)}
-              />
+            <View style={styles.topRow}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={onBack}
+                style={({ pressed }) => [
+                  styles.backButton,
+                  pressed && styles.backPressed,
+                ]}
+              >
+                <Text style={styles.backLabel}>Geri</Text>
+              </Pressable>
+              <Text style={styles.title}>Yeni El</Text>
             </View>
-          </View>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Bitiş türü</Text>
-            <View style={styles.chipWrap}>
-              {FINISH_OPTIONS.map((option) => {
-                const isNoneOption = option.value === 'none';
-                const disabled = finishOptionsDisabled
-                  ? !isNoneOption
-                  : isNoneOption;
-                return (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Bitiren</Text>
+              <View style={styles.chipWrap}>
+                {rosterPlayers.map((player) => (
                   <ChoiceChip
-                    key={option.value}
-                    label={option.label}
-                    selected={form.finishType === option.value}
-                    disabled={disabled}
-                    onPress={() => selectFinishType(option.value)}
+                    key={player.id}
+                    label={player.name}
+                    selected={form.finisherPlayerId === player.id}
+                    onPress={() => selectFinisher(player.id)}
                   />
-                );
-              })}
+                ))}
+                <ChoiceChip
+                  label="Kimse Bitmedi"
+                  selected={form.finisherPlayerId === null}
+                  onPress={() => selectFinisher(null)}
+                />
+              </View>
             </View>
-          </View>
 
-          {showHandAutoNote ? (
-            <View style={styles.infoCard}>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Bitiş türü</Text>
+              <View style={styles.chipWrap}>
+                {FINISH_OPTIONS.map((option) => {
+                  const isNoneOption = option.value === 'none';
+                  const disabled = finishOptionsDisabled
+                    ? !isNoneOption
+                    : isNoneOption;
+                  return (
+                    <ChoiceChip
+                      key={option.value}
+                      label={option.label}
+                      selected={form.finishType === option.value}
+                      disabled={disabled}
+                      onPress={() => selectFinishType(option.value)}
+                    />
+                  );
+                })}
+              </View>
+            </View>
+
+            {showHandAutoNote ? (
               <Text style={styles.infoText}>
-                Elden bitiş: diğer oyuncular açmamış sayılır. Ceza otomatik
-                hesaplanır.
+                Elden bitiş: diğerleri açmamış sayılır.
               </Text>
-            </View>
-          ) : null}
+            ) : null}
 
-          {showPlayerCards
-            ? visiblePlayerIds.map((playerId) => {
-                const playerForm = form.players.find(
-                  (player) => player.playerId === playerId,
-                );
-                const playerName = nameByPlayerId.get(playerId);
-                if (!playerForm || !playerName) {
-                  return null;
-                }
+            {showPlayerCards
+              ? visiblePlayerIds.map((playerId) => {
+                  const playerForm = form.players.find(
+                    (player) => player.playerId === playerId,
+                  );
+                  const playerName = nameByPlayerId.get(playerId);
+                  if (!playerForm || !playerName) {
+                    return null;
+                  }
 
-                const mode = getPlayerCardMode(form, playerId);
-                const opened = playerForm.openType !== 'didNotOpen';
+                  const mode = getPlayerCardMode(form, playerId);
+                  const opened = playerForm.openType !== 'didNotOpen';
 
-                return (
-                  <View key={playerId} style={styles.playerCard}>
-                    <Text style={styles.playerTitle}>{playerName}</Text>
+                  return (
+                    <View key={playerId} style={styles.playerCard}>
+                      <Text style={styles.playerTitle}>{playerName}</Text>
 
-                    {mode.showOpenedChoice ? (
-                      <View style={styles.chipWrap}>
-                        <ChoiceChip
-                          label="Açtı"
-                          selected={opened}
-                          onPress={() => setOpened(playerId, true)}
-                        />
-                        <ChoiceChip
-                          label="Açmadı"
-                          selected={!opened}
-                          onPress={() => setOpened(playerId, false)}
-                        />
-                      </View>
-                    ) : null}
+                      {mode.showOpenedChoice ? (
+                        <View style={styles.chipWrap}>
+                          <ChoiceChip
+                            label="Açtı"
+                            selected={opened}
+                            onPress={() => setOpened(playerId, true)}
+                          />
+                          <ChoiceChip
+                            label="Açmadı"
+                            selected={!opened}
+                            onPress={() => setOpened(playerId, false)}
+                          />
+                        </View>
+                      ) : null}
 
-                    {mode.showSeriesDoubles ? (
-                      <View style={styles.chipWrap}>
-                        <ChoiceChip
-                          label="Seri"
-                          selected={playerForm.openType === 'series'}
-                          onPress={() => setOpenKind(playerId, 'series')}
-                        />
-                        <ChoiceChip
-                          label="Çift"
-                          selected={playerForm.openType === 'doubles'}
-                          onPress={() => setOpenKind(playerId, 'doubles')}
-                        />
-                      </View>
-                    ) : null}
+                      {mode.showSeriesDoubles ? (
+                        <View style={styles.chipWrap}>
+                          <ChoiceChip
+                            label="Seri"
+                            selected={playerForm.openType === 'series'}
+                            onPress={() => setOpenKind(playerId, 'series')}
+                          />
+                          <ChoiceChip
+                            label="Çift"
+                            selected={playerForm.openType === 'doubles'}
+                            onPress={() => setOpenKind(playerId, 'doubles')}
+                          />
+                        </View>
+                      ) : null}
 
-                    {mode.showRemainingTiles ? (
-                      <View style={styles.fieldBlock}>
-                        <Text style={styles.fieldLabel}>Kalan taş puanı</Text>
-                        <TextInput
-                          keyboardType="number-pad"
-                          value={playerForm.remainingTilePointsText}
-                          onChangeText={(value) =>
-                            updatePlayer(playerId, {
-                              remainingTilePointsText: value,
-                            })
-                          }
-                          onBlur={() =>
-                            updatePlayer(playerId, {
-                              remainingTilePointsText: String(
-                                parseNonNegativeNumber(
-                                  playerForm.remainingTilePointsText,
+                      {mode.showRemainingTiles ? (
+                        <View style={styles.tileRow}>
+                          <Text style={styles.tileLabel}>Kalan taş</Text>
+                          <TextInput
+                            keyboardType="number-pad"
+                            value={playerForm.remainingTilePointsText}
+                            onChangeText={(value) =>
+                              updatePlayer(playerId, {
+                                remainingTilePointsText: value,
+                              })
+                            }
+                            onBlur={() =>
+                              updatePlayer(playerId, {
+                                remainingTilePointsText: String(
+                                  parseNonNegativeNumber(
+                                    playerForm.remainingTilePointsText,
+                                  ),
                                 ),
-                              ),
-                            })
-                          }
-                          placeholderTextColor={colors.textSecondary}
-                          style={styles.input}
-                        />
-                      </View>
-                    ) : null}
+                              })
+                            }
+                            placeholderTextColor={colors.textSecondary}
+                            style={styles.tileInput}
+                          />
+                        </View>
+                      ) : null}
+                    </View>
+                  );
+                })
+              : null}
+
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+
+            {preview ? (
+              <View style={styles.resultCard}>
+                <Text style={styles.resultTitle}>El Sonucu</Text>
+                <Text style={styles.resultHint}>
+                  Bitiren 0 puan görünür; bu normaldir.
+                </Text>
+                {preview.players.map((playerScore) => (
+                  <View key={playerScore.playerId} style={styles.resultRow}>
+                    <Text style={styles.resultName}>
+                      {nameByPlayerId.get(playerScore.playerId) ??
+                        playerScore.playerId}
+                    </Text>
+                    <Text style={styles.resultValue}>{playerScore.score}</Text>
                   </View>
-                );
-              })
-            : null}
-
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-
-          <PrimaryButton label="Önizle" onPress={handlePreview} />
-
-          {preview ? (
-            <View style={styles.resultCard}>
-              <Text style={styles.resultTitle}>El Sonucu</Text>
-              <Text style={styles.resultHint}>
-                Bitiren oyuncu 0 puan görünür; bu normaldir.
-              </Text>
-
-              <Text style={styles.resultSectionLabel}>Oyuncular</Text>
-              {preview.players.map((playerScore) => (
-                <View key={playerScore.playerId} style={styles.resultRow}>
-                  <Text style={styles.resultName}>
-                    {nameByPlayerId.get(playerScore.playerId) ??
-                      playerScore.playerId}
-                  </Text>
-                  <Text style={styles.resultValue}>{playerScore.score}</Text>
-                </View>
-              ))}
-
-              <Text style={styles.resultSectionLabel}>Takımlar</Text>
-              {preview.teams.map((teamScore) => (
-                <View key={teamScore.teamId} style={styles.resultRow}>
-                  <Text style={styles.resultName}>
-                    {teamNameFromActiveGame(game, teamScore.teamId)}
-                  </Text>
-                  <Text style={styles.resultValue}>{teamScore.score}</Text>
-                </View>
-              ))}
-
-              {preview.finishTeamBonus.teamId !== null ? (
-                <>
-                  <Text style={styles.resultSectionLabel}>Bitiş bonusu</Text>
+                ))}
+                <View style={styles.resultDivider} />
+                {preview.teams.map((teamScore) => (
+                  <View key={teamScore.teamId} style={styles.resultRow}>
+                    <Text style={styles.resultName}>
+                      {teamNameFromActiveGame(game, teamScore.teamId)}
+                    </Text>
+                    <Text style={styles.resultValue}>{teamScore.score}</Text>
+                  </View>
+                ))}
+                {preview.finishTeamBonus.teamId !== null ? (
                   <View style={styles.resultRow}>
                     <Text style={styles.resultName}>
+                      Bonus ·{' '}
                       {teamNameFromActiveGame(
                         game,
                         preview.finishTeamBonus.teamId,
@@ -412,27 +403,28 @@ export function RoundEntryScreen({
                       {preview.finishTeamBonus.amount}
                     </Text>
                   </View>
-                </>
-              ) : null}
-            </View>
-          ) : null}
+                ) : null}
+              </View>
+            ) : null}
+          </ScrollView>
 
-          <PrimaryButton
-            label="Eli Kaydet"
-            onPress={handleSave}
-            disabled={!preview}
-          />
-          <Pressable
-            accessibilityRole="button"
-            onPress={onBack}
-            style={({ pressed }) => [
-              styles.cancelButton,
-              pressed && styles.cancelPressed,
-            ]}
-          >
-            <Text style={styles.cancelLabel}>İptal</Text>
-          </Pressable>
-        </ScrollView>
+          <View style={styles.footer}>
+            <PrimaryButton label="Önizle" onPress={handlePreview} />
+            {preview ? (
+              <PrimaryButton label="Eli Kaydet" onPress={handleSave} />
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              onPress={onBack}
+              style={({ pressed }) => [
+                styles.cancelButton,
+                pressed && styles.cancelPressed,
+              ]}
+            >
+              <Text style={styles.cancelLabel}>İptal</Text>
+            </Pressable>
+          </View>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -446,16 +438,24 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
+  shell: {
+    flex: 1,
+  },
   content: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xl,
-    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.sm,
+    gap: spacing.sm,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    minHeight: 44,
   },
   backButton: {
-    alignSelf: 'flex-start',
-    minHeight: 40,
+    minHeight: 44,
+    minWidth: 44,
     paddingHorizontal: spacing.sm,
     justifyContent: 'center',
     borderRadius: radii.sm,
@@ -468,26 +468,27 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   title: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '700',
     color: colors.text,
   },
   section: {
-    gap: spacing.xs,
+    gap: 6,
   },
   sectionTitle: {
-    ...typography.buttonSecondary,
+    fontSize: 13,
+    fontWeight: '700',
     color: colors.primary,
   },
   chipWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.xs,
+    gap: 6,
   },
   chip: {
-    minHeight: 46,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.md,
+    minHeight: 44,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radii.sm,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surfaceElevated,
@@ -505,7 +506,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   chipLabel: {
-    ...typography.buttonSecondary,
+    fontSize: 15,
+    fontWeight: '600',
     color: colors.primary,
   },
   chipLabelSelected: {
@@ -514,79 +516,76 @@ const styles = StyleSheet.create({
   chipLabelDisabled: {
     color: colors.textSecondary,
   },
-  infoCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-  },
   infoText: {
-    ...typography.body,
+    ...typography.infoLabel,
     color: colors.textSecondary,
   },
   playerCard: {
     backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    padding: spacing.md,
+    borderRadius: radii.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
-    gap: spacing.sm,
+    gap: 6,
   },
   playerTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
     color: colors.text,
   },
-  fieldLabel: {
+  tileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  tileLabel: {
     ...typography.infoLabel,
     color: colors.textSecondary,
+    minWidth: 72,
   },
-  fieldBlock: {
-    gap: spacing.xs,
-  },
-  input: {
-    minHeight: 48,
-    borderRadius: radii.md,
+  tileInput: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: radii.sm,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surfaceElevated,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.sm,
     color: colors.text,
     fontSize: 17,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   error: {
     ...typography.body,
     color: '#8B2E2E',
     backgroundColor: '#F3D9D4',
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
     overflow: 'hidden',
   },
   resultCard: {
     backgroundColor: colors.surfaceElevated,
-    borderRadius: radii.md,
-    padding: spacing.md,
+    borderRadius: radii.sm,
+    padding: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
-    gap: spacing.xs,
+    gap: 4,
   },
   resultTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: colors.text,
   },
   resultHint: {
     ...typography.infoLabel,
     color: colors.textSecondary,
-    marginBottom: spacing.xs,
   },
-  resultSectionLabel: {
-    ...typography.infoLabel,
-    color: colors.primary,
-    marginTop: spacing.xs,
+  resultDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: 4,
   },
   resultRow: {
     flexDirection: 'row',
@@ -595,13 +594,23 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   resultName: {
-    ...typography.body,
+    fontSize: 15,
     color: colors.text,
     flex: 1,
   },
   resultValue: {
-    ...typography.buttonSecondary,
+    fontSize: 15,
+    fontWeight: '700',
     color: colors.text,
+  },
+  footer: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.background,
+    gap: spacing.xs,
   },
   cancelButton: {
     minHeight: 44,
