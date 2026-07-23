@@ -1,14 +1,11 @@
 import { resolveActivityLog } from './gameLifecycle';
 import { resolveGameMode } from './gameMode';
 import { rosterPlayersInOrder } from './gameResult';
-import { resolveTargetRoundCount } from './targetRoundCount';
 import {
   ActiveGameData,
   ActiveGamePlayer,
 } from './screens/ActiveGameScreen';
 import { GameActivityEvent } from './gameActivity';
-
-export const SCORE_SHEET_PAGE_SIZE = 8;
 
 export type ScoreSheetCell =
   | { kind: 'empty' }
@@ -29,8 +26,10 @@ export type ScoreSheetModel = {
   playerIds: string[];
   teamNames: [string, string] | null;
   teamTotals: [number, number] | null;
+  /** Kronolojik el + ceza satırları + sonda toplam satırı. */
   rows: ScoreSheetRow[];
-  pageCount: number;
+  /** Toplam hariç activity satır sayısı. */
+  activityRowCount: number;
 };
 
 function cellForAmount(amount: number | null | undefined): ScoreSheetCell {
@@ -88,6 +87,24 @@ function buildRowsFromLog(
   return rows;
 }
 
+export function getScoreSheetBodyRows(sheet: ScoreSheetModel): ScoreSheetRow[] {
+  return sheet.rows.filter((row) => row.kind !== 'total');
+}
+
+export function getScoreSheetTotalRow(
+  sheet: ScoreSheetModel,
+): ScoreSheetRow | null {
+  return sheet.rows.find((row) => row.kind === 'total') ?? null;
+}
+
+/** Activity satır sayısı arttı mı? (otomatik alta kaydırma için). */
+export function didActivityRowCountIncrease(
+  previousCount: number,
+  nextCount: number,
+): boolean {
+  return nextCount > previousCount;
+}
+
 export function buildScoreSheet(game: ActiveGameData): ScoreSheetModel {
   const mode = resolveGameMode(game.gameMode);
   const players = rosterPlayersInOrder(game);
@@ -105,9 +122,6 @@ export function buildScoreSheet(game: ActiveGameData): ScoreSheetModel {
     })),
   };
 
-  const rows = [...bodyRows, totalRow];
-  const pageCount = Math.max(1, Math.ceil(Math.max(bodyRows.length, 1) / SCORE_SHEET_PAGE_SIZE));
-
   return {
     gameMode: mode,
     playerNames: players.map((player) => player.name),
@@ -120,40 +134,7 @@ export function buildScoreSheet(game: ActiveGameData): ScoreSheetModel {
       mode === 'paired'
         ? [game.teams[0].totalScore, game.teams[1].totalScore]
         : null,
-    rows,
-    pageCount,
+    rows: [...bodyRows, totalRow],
+    activityRowCount: bodyRows.length,
   };
-}
-
-/** Toplam satırı hariç gövde satırları için sayfa dilimi. */
-export function paginateScoreSheetRows(
-  sheet: ScoreSheetModel,
-  pageIndex: number,
-): { pageRows: ScoreSheetRow[]; totalRow: ScoreSheetRow | null; pageIndex: number; pageCount: number } {
-  const body = sheet.rows.filter((row) => row.kind !== 'total');
-  const totalRow = sheet.rows.find((row) => row.kind === 'total') ?? null;
-  const pageCount = Math.max(1, Math.ceil(Math.max(body.length, 1) / SCORE_SHEET_PAGE_SIZE));
-  const safePage = Math.min(Math.max(pageIndex, 0), pageCount - 1);
-  const start = safePage * SCORE_SHEET_PAGE_SIZE;
-  const pageRows = body.slice(start, start + SCORE_SHEET_PAGE_SIZE);
-  return { pageRows, totalRow, pageIndex: safePage, pageCount };
-}
-
-export function pageIndexForLastEvent(sheet: ScoreSheetModel): number {
-  const body = sheet.rows.filter((row) => row.kind !== 'total');
-  if (body.length === 0) {
-    return 0;
-  }
-  return Math.floor((body.length - 1) / SCORE_SHEET_PAGE_SIZE);
-}
-
-export function scoreSheetPageLabel(
-  pageIndex: number,
-  pageCount: number,
-  targetRoundCount?: number,
-): string {
-  const target = resolveTargetRoundCount(targetRoundCount);
-  const start = pageIndex * SCORE_SHEET_PAGE_SIZE + 1;
-  const end = Math.min((pageIndex + 1) * SCORE_SHEET_PAGE_SIZE, Math.max(target, pageCount * SCORE_SHEET_PAGE_SIZE));
-  return `${pageIndex + 1} / ${pageCount} · ${start}–${end}`;
 }

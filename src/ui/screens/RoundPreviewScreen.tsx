@@ -1,13 +1,6 @@
-import {
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 import { CalculateRoundResult } from '../../engine/calculateRound';
-import { FinishType } from '../../engine/models';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SecondaryButton } from '../components/SecondaryButton';
 import { resolveGameMode } from '../gameMode';
@@ -16,6 +9,7 @@ import {
   teamNameFromActiveGame,
 } from '../gameRoster';
 import { playerIdFromIndividualTeamId } from '../individualRound';
+import { finishTypeLabel } from '../roundEntry/finishLabels';
 import { RoundPreviewMeta } from '../roundEntry/previewState';
 import { colors, radii, spacing, typography } from '../theme';
 import { ActiveGameData } from './ActiveGameScreen';
@@ -29,14 +23,6 @@ type RoundPreviewScreenProps = {
   saving?: boolean;
   onBack: () => void;
   onSave: () => void;
-};
-
-const FINISH_LABELS: Record<FinishType, string> = {
-  normal: 'Normal',
-  okey: 'Okeyle',
-  fromHand: 'Elden',
-  fromHandAndOkey: 'Elden+Okey',
-  none: 'Yok',
 };
 
 export function RoundPreviewScreen({
@@ -64,14 +50,11 @@ export function RoundPreviewScreen({
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.shell}>
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
+        <View style={styles.content}>
           <Text style={styles.title}>El Önizleme</Text>
           <Text style={styles.metaLine}>Bitiren: {finisherName}</Text>
           <Text style={styles.metaLine}>
-            Bitiş türü: {FINISH_LABELS[meta.finishType]}
+            Bitiş türü: {finishTypeLabel(meta.finishType)}
           </Text>
 
           <View style={styles.card}>
@@ -127,7 +110,7 @@ export function RoundPreviewScreen({
               ) : null}
             </View>
           )}
-        </ScrollView>
+        </View>
 
         <View style={styles.footer}>
           <PrimaryButton
@@ -138,6 +121,7 @@ export function RoundPreviewScreen({
           <SecondaryButton
             label="Geri Dön ve Düzelt"
             onPress={onBack}
+            disabled={saving}
             style={styles.secondary}
           />
         </View>
@@ -155,13 +139,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    flex: 1,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
-    gap: spacing.md,
+    paddingBottom: spacing.sm,
+    gap: spacing.sm,
+    justifyContent: 'center',
   },
   title: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '700',
     color: colors.text,
   },
@@ -171,11 +157,11 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radii.lg,
+    borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.md,
-    gap: spacing.sm,
+    gap: 6,
   },
   cardLabel: {
     ...typography.infoLabel,
@@ -185,6 +171,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: spacing.sm,
+    minHeight: 24,
+    alignItems: 'center',
   },
   name: {
     ...typography.body,

@@ -21,9 +21,9 @@ import {
 } from '../screens/ActiveGameScreen';
 import {
   buildScoreSheet,
-  pageIndexForLastEvent,
-  paginateScoreSheetRows,
-  SCORE_SHEET_PAGE_SIZE,
+  didActivityRowCountIncrease,
+  getScoreSheetBodyRows,
+  getScoreSheetTotalRow,
 } from '../scoreSheet';
 import { applyQuickPenaltyToPairedGame } from '../applyGameUpdates';
 
@@ -309,30 +309,85 @@ describe('score sheet presentation', () => {
     expect(sheet.rows[sheet.rows.length - 1].kind).toBe('total');
   });
 
-  it('paginates and jumps to last event page', () => {
-    const game = gameWithScores([1, 2, 3, 4], 'individual');
-    game.activityLog = Array.from({ length: 10 }, (_, index) => ({
-      id: `round-${index}`,
-      type: 'round' as const,
-      createdAt: new Date(0).toISOString(),
-      sequence: index + 1,
-      roundNumber: index + 1,
-      playerScores: [
-        { playerId: 'player-1', score: 1 },
-        { playerId: 'player-2', score: 2 },
-        { playerId: 'player-3', score: 3 },
-        { playerId: 'player-4', score: 4 },
-      ],
-      teamScores: [],
-      finishType: 'none' as const,
-      finisherPlayerId: null,
-      finishBonusAmount: 0,
-    }));
+  it('keeps all activity rows in one chronological list without pagination', () => {
+    const game = gameWithScores([10, 20, 30, 40], 'individual');
+    game.activityLog = [
+      {
+        id: 'round-1',
+        type: 'round',
+        createdAt: new Date(0).toISOString(),
+        sequence: 1,
+        roundNumber: 1,
+        playerScores: [
+          { playerId: 'player-1', score: 1 },
+          { playerId: 'player-2', score: 2 },
+          { playerId: 'player-3', score: 3 },
+          { playerId: 'player-4', score: 4 },
+        ],
+        teamScores: [],
+        finishType: 'none',
+        finisherPlayerId: null,
+        finishBonusAmount: 0,
+      },
+      {
+        id: 'penalty-1',
+        type: 'penalty',
+        createdAt: new Date(1).toISOString(),
+        sequence: 2,
+        playerId: 'player-2',
+        playerName: 'B',
+        source: 'fixed',
+        penaltyLabel: 'Gösterge açma',
+        amount: 101,
+      },
+      {
+        id: 'round-2',
+        type: 'round',
+        createdAt: new Date(2).toISOString(),
+        sequence: 3,
+        roundNumber: 2,
+        playerScores: [
+          { playerId: 'player-1', score: 5 },
+          { playerId: 'player-2', score: 6 },
+          { playerId: 'player-3', score: 7 },
+          { playerId: 'player-4', score: 8 },
+        ],
+        teamScores: [],
+        finishType: 'none',
+        finisherPlayerId: null,
+        finishBonusAmount: 0,
+      },
+    ];
+
     const sheet = buildScoreSheet(game);
-    expect(pageIndexForLastEvent(sheet)).toBe(1);
-    const page0 = paginateScoreSheetRows(sheet, 0);
-    expect(page0.pageRows).toHaveLength(SCORE_SHEET_PAGE_SIZE);
-    expect(page0.pageCount).toBe(2);
+    const body = getScoreSheetBodyRows(sheet);
+    const total = getScoreSheetTotalRow(sheet);
+
+    expect(sheet.activityRowCount).toBe(3);
+    expect(body).toHaveLength(3);
+    expect(body.map((row) => row.kind)).toEqual([
+      'round',
+      'penalty',
+      'round',
+    ]);
+    expect(body.map((row) => row.label)).toEqual(['1', 'C1', '2']);
+    expect(total?.kind).toBe('total');
+    expect(total?.cells.map((cell) =>
+      cell.kind === 'value' ? cell.text : null,
+    )).toEqual(['10', '20', '30', '40']);
+    expect(sheet.rows).toHaveLength(4);
+  });
+
+  it('detects activity row count increases for auto-scroll', () => {
+    expect(didActivityRowCountIncrease(0, 1)).toBe(true);
+    expect(didActivityRowCountIncrease(5, 5)).toBe(false);
+    expect(didActivityRowCountIncrease(8, 7)).toBe(false);
+  });
+
+  it('paired sheet keeps team totals from full activity log', () => {
+    const sheet = buildScoreSheet(gameWithScores([10, 20, 30, 40], 'paired'));
+    expect(sheet.teamNames).toEqual(['Oğuz Ailesi', 'Güldiken Ailesi']);
+    expect(sheet.teamTotals).toEqual([30, 70]);
   });
 
   it('individual sheet omits team headers/totals', () => {

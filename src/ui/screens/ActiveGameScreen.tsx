@@ -7,19 +7,17 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import type { GameMode } from '../gameMode';
 import type { FinishType } from '../../engine/models';
 import type { GameActivityEvent, GameStatus } from '../gameActivity';
 import { resolveGameMode } from '../gameMode';
+import { GameActionsSheet } from '../components/GameActionsSheet';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SecondaryButton } from '../components/SecondaryButton';
 import { ScoreSheetTable } from '../components/ScoreSheetTable';
-import {
-  buildScoreSheet,
-  pageIndexForLastEvent,
-} from '../scoreSheet';
+import { buildScoreSheet } from '../scoreSheet';
 import {
   remainingRoundCount,
   resolveTargetRoundCount,
@@ -100,11 +98,7 @@ export function ActiveGameScreen({
   const targetRounds = resolveTargetRoundCount(game.targetRoundCount);
   const roundsLeft = remainingRoundCount(playedRounds, targetRounds);
   const sheet = useMemo(() => buildScoreSheet(game), [game]);
-  const [pageIndex, setPageIndex] = useState(() => pageIndexForLastEvent(sheet));
-
-  useEffect(() => {
-    setPageIndex(pageIndexForLastEvent(sheet));
-  }, [sheet]);
+  const [actionsOpen, setActionsOpen] = useState(false);
 
   function confirmFinishEarly() {
     Alert.alert(
@@ -155,12 +149,7 @@ export function ActiveGameScreen({
         </View>
 
         <View style={styles.sheetWrap}>
-          <ScoreSheetTable
-            sheet={sheet}
-            pageIndex={pageIndex}
-            onPageChange={setPageIndex}
-            targetRoundCount={game.targetRoundCount}
-          />
+          <ScoreSheetTable sheet={sheet} compact={compact} />
         </View>
 
         <View style={styles.actionsBlock}>
@@ -170,23 +159,21 @@ export function ActiveGameScreen({
             onPress={onAddPenalty}
             style={styles.fullButton}
           />
-        </View>
-
-        <View style={styles.lifecycleBlock}>
-          <Text style={styles.lifecycleTitle}>Oyun İşlemleri</Text>
-          <View style={styles.lifecycleRow}>
-            <Pressable onPress={onPause} style={styles.linkButton}>
-              <Text style={styles.linkLabel}>Durdur</Text>
-            </Pressable>
-            <Pressable onPress={confirmFinishEarly} style={styles.linkButton}>
-              <Text style={styles.linkLabel}>Bitir</Text>
-            </Pressable>
-            <Pressable onPress={confirmAbandon} style={styles.linkButton}>
-              <Text style={[styles.linkLabel, styles.dangerLabel]}>İptal</Text>
-            </Pressable>
-          </View>
+          <SecondaryButton
+            label="Oyun İşlemleri"
+            onPress={() => setActionsOpen(true)}
+            style={styles.fullButton}
+          />
         </View>
       </View>
+
+      <GameActionsSheet
+        visible={actionsOpen}
+        onClose={() => setActionsOpen(false)}
+        onPause={onPause}
+        onFinishEarly={confirmFinishEarly}
+        onAbandon={confirmAbandon}
+      />
     </SafeAreaView>
   );
 }
@@ -248,7 +235,6 @@ const styles = StyleSheet.create({
   sheetWrap: {
     flex: 1,
     minHeight: 0,
-    justifyContent: 'center',
   },
   actionsBlock: {
     gap: spacing.xs,
@@ -256,29 +242,5 @@ const styles = StyleSheet.create({
   fullButton: {
     flexGrow: 0,
     width: '100%',
-  },
-  lifecycleBlock: {
-    gap: 2,
-  },
-  lifecycleTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  lifecycleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  linkButton: {
-    minHeight: 40,
-    paddingHorizontal: spacing.sm,
-    justifyContent: 'center',
-  },
-  linkLabel: {
-    ...typography.buttonSecondary,
-    color: colors.primary,
-  },
-  dangerLabel: {
-    color: '#8B2E2E',
   },
 });

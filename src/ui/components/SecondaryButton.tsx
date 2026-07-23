@@ -6,24 +6,30 @@ type SecondaryButtonProps = {
   label: string;
   onPress: () => void;
   style?: ViewStyle;
+  disabled?: boolean;
 };
 
 export function SecondaryButton({
   label,
   onPress,
   style,
+  disabled = false,
 }: SecondaryButtonProps) {
   return (
     <Pressable
       accessibilityRole="button"
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        pressed && styles.pressed,
+        pressed && !disabled && styles.pressed,
+        disabled && styles.disabled,
         style,
       ]}
     >
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, disabled && styles.labelDisabled]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -48,8 +54,14 @@ const styles = StyleSheet.create({
   pressed: {
     backgroundColor: colors.surface,
   },
+  disabled: {
+    opacity: 0.45,
+  },
   label: {
     ...typography.buttonSecondary,
     color: colors.primary,
+  },
+  labelDisabled: {
+    color: colors.textSecondary,
   },
 });

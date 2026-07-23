@@ -1,19 +1,25 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
 import {
   ScoreSheetCell,
   ScoreSheetModel,
   ScoreSheetRow,
-  paginateScoreSheetRows,
-  scoreSheetPageLabel,
+  didActivityRowCountIncrease,
+  getScoreSheetBodyRows,
+  getScoreSheetTotalRow,
 } from '../scoreSheet';
 import { colors, radii, spacing, typography } from '../theme';
 
 type ScoreSheetTableProps = {
   sheet: ScoreSheetModel;
-  pageIndex: number;
-  onPageChange: (pageIndex: number) => void;
-  targetRoundCount?: number;
+  compact?: boolean;
 };
 
 function CellText({ cell }: { cell: ScoreSheetCell }) {
@@ -33,14 +39,17 @@ function CellText({ cell }: { cell: ScoreSheetCell }) {
 function SheetRowView({
   row,
   isHeader,
+  compact,
 }: {
   row: ScoreSheetRow;
   isHeader?: boolean;
+  compact?: boolean;
 }) {
   return (
     <View
       style={[
         styles.row,
+        compact && styles.rowCompact,
         row.kind === 'penalty' && styles.penaltyRow,
         row.kind === 'total' && styles.totalRow,
         isHeader && styles.headerRow,
@@ -63,12 +72,15 @@ function SheetRowView({
 
 export function ScoreSheetTable({
   sheet,
-  pageIndex,
-  onPageChange,
-  targetRoundCount,
+  compact = false,
 }: ScoreSheetTableProps) {
-  const { pageRows, totalRow, pageIndex: safePage, pageCount } =
-    paginateScoreSheetRows(sheet, pageIndex);
+  const { height } = useWindowDimensions();
+  const bodyRows = getScoreSheetBodyRows(sheet);
+  const totalRow = getScoreSheetTotalRow(sheet);
+  const scrollRef = useRef<ScrollView>(null);
+  const previousCountRef = useRef<number | null>(null);
+  const stickToEndRef = useRef(true);
+  const animateStickRef = useRef(false);
 
   const headerRow: ScoreSheetRow = {
     id: 'header',
@@ -80,74 +92,87 @@ export function ScoreSheetTable({
     })),
   };
 
+  // Küçük ekranda gövde için daha sıkı minimum; flex ile kalan alanı doldurur.
+  const bodyMinHeight = compact
+    ? Math.max(120, Math.round(height * 0.22))
+    : Math.max(160, Math.round(height * 0.28));
+
+  useEffect(() => {
+    const previous = previousCountRef.current;
+    const next = sheet.activityRowCount;
+
+    if (previous !== null && didActivityRowCountIncrease(previous, next)) {
+      stickToEndRef.current = true;
+      animateStickRef.current = true;
+    }
+
+    previousCountRef.current = next;
+  }, [sheet.activityRowCount]);
+
+  function handleContentSizeChange() {
+    if (!stickToEndRef.current || sheet.activityRowCount === 0) {
+      return;
+    }
+    scrollRef.current?.scrollToEnd({ animated: animateStickRef.current });
+    stickToEndRef.current = false;
+  }
+
   return (
-    <View style={styles.frame}>
-      {sheet.gameMode === 'paired' && sheet.teamNames ? (
-        <View style={styles.teamHeader}>
-          <Text style={styles.teamHeaderLeft} numberOfLines={1}>
-            {sheet.teamNames[0]}
-          </Text>
-          <Text style={styles.teamHeaderRight} numberOfLines={1}>
-            {sheet.teamNames[1]}
-          </Text>
-        </View>
-      ) : (
-        <Text style={styles.soloTitle}>Bireysel Skor Tablosu</Text>
-      )}
-
-      <SheetRowView row={headerRow} isHeader />
-
-      {pageRows.length === 0 ? (
-        <Text style={styles.empty}>Henüz el yok</Text>
-      ) : (
-        pageRows.map((row) => (
-          <View key={row.id}>
-            <SheetRowView row={row} />
-            {row.detail ? (
-              <Text style={styles.detail} numberOfLines={1}>
-                {row.detail}
-              </Text>
-            ) : null}
+    <View style={[styles.frame, compact && styles.frameCompact]}>
+      <View style={styles.stickyHeader}>
+        {sheet.gameMode === 'paired' && sheet.teamNames ? (
+          <View style={styles.teamHeader}>
+            <Text style={styles.teamHeaderLeft} numberOfLines={1}>
+              {sheet.teamNames[0]}
+            </Text>
+            <Text style={styles.teamHeaderRight} numberOfLines={1}>
+              {sheet.teamNames[1]}
+            </Text>
           </View>
-        ))
-      )}
+        ) : (
+          <Text style={styles.soloTitle}>Bireysel Skor Tablosu</Text>
+        )}
+        <SheetRowView row={headerRow} isHeader compact={compact} />
+      </View>
 
-      {totalRow ? <SheetRowView row={totalRow} /> : null}
+      <ScrollView
+        ref={scrollRef}
+        style={[styles.bodyScroll, { minHeight: bodyMinHeight }]}
+        contentContainerStyle={styles.bodyContent}
+        showsVerticalScrollIndicator
+        keyboardShouldPersistTaps="handled"
+        onContentSizeChange={handleContentSizeChange}
+      >
+        {bodyRows.length === 0 ? (
+          <Text style={styles.empty}>Henüz el yok</Text>
+        ) : (
+          bodyRows.map((row) => (
+            <View key={row.id}>
+              <SheetRowView row={row} compact={compact} />
+              {row.detail ? (
+                <Text style={styles.detail} numberOfLines={1}>
+                  {row.detail}
+                </Text>
+              ) : null}
+            </View>
+          ))
+        )}
+      </ScrollView>
 
-      {sheet.gameMode === 'paired' && sheet.teamTotals && sheet.teamNames ? (
-        <View style={styles.teamTotals}>
-          <Text style={styles.teamTotalLine} numberOfLines={1}>
-            {sheet.teamNames[0]}: {sheet.teamTotals[0]}
-          </Text>
-          <Text style={styles.teamTotalLine} numberOfLines={1}>
-            {sheet.teamNames[1]}: {sheet.teamTotals[1]}
-          </Text>
-        </View>
-      ) : null}
-
-      <View style={styles.pager}>
-        <Pressable
-          accessibilityRole="button"
-          disabled={safePage <= 0}
-          onPress={() => onPageChange(safePage - 1)}
-          style={[styles.pagerBtn, safePage <= 0 && styles.pagerDisabled]}
-        >
-          <Text style={styles.pagerLabel}>‹</Text>
-        </Pressable>
-        <Text style={styles.pagerMeta}>
-          {scoreSheetPageLabel(safePage, pageCount, targetRoundCount)}
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          disabled={safePage >= pageCount - 1}
-          onPress={() => onPageChange(safePage + 1)}
-          style={[
-            styles.pagerBtn,
-            safePage >= pageCount - 1 && styles.pagerDisabled,
-          ]}
-        >
-          <Text style={styles.pagerLabel}>›</Text>
-        </Pressable>
+      <View style={styles.stickyFooter}>
+        {totalRow ? (
+          <SheetRowView row={totalRow} compact={compact} />
+        ) : null}
+        {sheet.gameMode === 'paired' && sheet.teamTotals && sheet.teamNames ? (
+          <View style={styles.teamTotals}>
+            <Text style={styles.teamTotalLine} numberOfLines={1}>
+              {sheet.teamNames[0]}: {sheet.teamTotals[0]}
+            </Text>
+            <Text style={styles.teamTotalLine} numberOfLines={1}>
+              {sheet.teamNames[1]}: {sheet.teamTotals[1]}
+            </Text>
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -155,13 +180,36 @@ export function ScoreSheetTable({
 
 const styles = StyleSheet.create({
   frame: {
+    flex: 1,
+    minHeight: 0,
     borderWidth: 1.5,
     borderColor: colors.primary,
     borderRadius: radii.md,
     backgroundColor: colors.surfaceElevated,
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.xs,
+    overflow: 'hidden',
+  },
+  frameCompact: {
+    paddingVertical: 4,
+  },
+  stickyHeader: {
     gap: 2,
+    paddingBottom: 2,
+  },
+  stickyFooter: {
+    borderTopWidth: 1,
+    borderTopColor: colors.primary,
+    paddingTop: 2,
+    gap: 2,
+  },
+  bodyScroll: {
+    flex: 1,
+    minHeight: 0,
+  },
+  bodyContent: {
+    flexGrow: 1,
+    paddingBottom: 4,
   },
   teamHeader: {
     flexDirection: 'row',
@@ -199,6 +247,10 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
+  rowCompact: {
+    minHeight: 24,
+    paddingVertical: 1,
+  },
   headerRow: {
     backgroundColor: colors.surface,
     borderTopWidth: 0,
@@ -210,9 +262,7 @@ const styles = StyleSheet.create({
   },
   totalRow: {
     backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.primary,
-    marginTop: 2,
+    borderTopWidth: 0,
   },
   labelCell: {
     width: 44,
@@ -254,7 +304,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   teamTotals: {
-    paddingTop: spacing.xs,
+    paddingTop: 2,
     paddingHorizontal: spacing.xs,
     gap: 2,
   },
@@ -262,33 +312,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: colors.primaryMuted,
-  },
-  pager: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: spacing.xs,
-    paddingHorizontal: spacing.xs,
-  },
-  pagerBtn: {
-    minWidth: 40,
-    minHeight: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.sm,
-    backgroundColor: colors.surface,
-  },
-  pagerDisabled: {
-    opacity: 0.35,
-  },
-  pagerLabel: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  pagerMeta: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textSecondary,
   },
 });

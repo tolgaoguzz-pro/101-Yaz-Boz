@@ -9,7 +9,10 @@ import {
 import { useEffect, useState } from 'react';
 
 import { calculateMatchupSeries, MatchupSeriesSummary } from '../../domain/tournament';
+import { CompletedGameRecord } from '../../domain/completedGame';
 import { listCompletedGamesByMatchup } from '../../persistence/completedGameRepository';
+import { PrimaryButton } from '../components/PrimaryButton';
+import { resolveGameMode } from '../gameMode';
 import {
   buildTournamentGameRow,
   formatSafeDateTime,
@@ -21,14 +24,19 @@ type TournamentDetailScreenProps = {
   matchupKey: string;
   onBack: () => void;
   onOpenGame: (gameId: string) => void;
+  onPlayAgain: (record: CompletedGameRecord) => void;
 };
 
 export function TournamentDetailScreen({
   matchupKey,
   onBack,
   onOpenGame,
+  onPlayAgain,
 }: TournamentDetailScreenProps) {
   const [series, setSeries] = useState<MatchupSeriesSummary | null>(null);
+  const [latestRecord, setLatestRecord] = useState<CompletedGameRecord | null>(
+    null,
+  );
   const [rows, setRows] = useState<TournamentGameRowModel[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -41,12 +49,14 @@ export function TournamentDetailScreen({
         const summary = calculateMatchupSeries(games);
         if (!cancelled) {
           setSeries(summary);
+          setLatestRecord(games[0] ?? null);
           setRows(games.map(buildTournamentGameRow));
         }
       } catch (error) {
         console.warn('[ui] TournamentDetailScreen load failed', error);
         if (!cancelled) {
           setSeries(null);
+          setLatestRecord(null);
           setRows([]);
         }
       } finally {
@@ -59,6 +69,11 @@ export function TournamentDetailScreen({
       cancelled = true;
     };
   }, [matchupKey]);
+
+  const playAgainLabel =
+    series && resolveGameMode(series.gameMode) === 'individual'
+      ? 'Bu Oyuncularla Yeni Oyun'
+      : 'Bu Takımlarla Yeni Oyun';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -130,6 +145,13 @@ export function TournamentDetailScreen({
                 </Text>
               ) : null}
             </View>
+
+            {latestRecord ? (
+              <PrimaryButton
+                label={playAgainLabel}
+                onPress={() => onPlayAgain(latestRecord)}
+              />
+            ) : null}
 
             <Text style={styles.sectionHeading}>Geçmiş Oyunlar</Text>
             {rows.map((row) => (

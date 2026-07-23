@@ -1,0 +1,23 @@
+warning: in the working copy of 'App.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ui/__tests__/scoreSheetAndRanking-test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ui/components/ScoreSheetTable.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ui/components/SecondaryButton.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ui/gameResult.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ui/scoreSheet.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ui/screens/ActiveGameScreen.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ui/screens/CompletedGameDetailScreen.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ui/screens/RoundEntryScreen.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ui/screens/RoundPreviewScreen.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/ui/screens/TournamentDetailScreen.tsx', LF will be replaced by CRLF the next time Git touches it
+ App.tsx                                       |  36 [32m+[m[31m-[m
+ src/ui/__tests__/scoreSheetAndRanking-test.ts | 107 [32m+++[m[31m--[m
+ src/ui/components/ScoreSheetTable.tsx         | 234 [32m+++++[m[31m-----[m
+ src/ui/components/SecondaryButton.tsx         |  16 [32m+[m[31m-[m
+ src/ui/gameResult.ts                          |  21 [32m+[m
+ src/ui/scoreSheet.ts                          |  65 [32m+[m[31m--[m
+ src/ui/screens/ActiveGameScreen.tsx           |  74 [32m+[m[31m--[m
+ src/ui/screens/CompletedGameDetailScreen.tsx  |  14 [32m+[m[31m-[m
+ src/ui/screens/RoundEntryScreen.tsx           | 637 [32m+++++++++++++++[m[31m-----------[m
+ src/ui/screens/RoundPreviewScreen.tsx         |  42 [32m+[m[31m-[m
+ src/ui/screens/TournamentDetailScreen.tsx     |  22 [32m+[m
+ 11 files changed, 743 insertions(+), 525 deletions(-)

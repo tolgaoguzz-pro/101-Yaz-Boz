@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
+import { Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
 import { usePersistedActiveGame } from './src/app/usePersistedActiveGame';
 import { ensureCompletedGamePersisted } from './src/domain/ensureCompletedGame';
-import { matchupKeyFromGame } from './src/domain/completedGame';
+import {
+  CompletedGameRecord,
+  matchupKeyFromGame,
+} from './src/domain/completedGame';
 import { calculateMatchupSeries } from './src/domain/tournament';
 import { CalculateRoundResult } from './src/engine/calculateRound';
 import { listCompletedGamesByMatchup } from './src/persistence/completedGameRepository';
@@ -19,6 +23,7 @@ import {
   resumeGame,
 } from './src/ui/gameLifecycle';
 import {
+  createGameFromCompletedRecord,
   createRematchGame,
   isGameComplete,
 } from './src/ui/gameResult';
@@ -214,6 +219,33 @@ export default function App() {
     setScreen('tournamentList');
   }
 
+  function startFromCompletedRecord(record: CompletedGameRecord) {
+    const next = createGameFromCompletedRecord(record);
+    commitActiveGame(next);
+    setSeriesSummaryLine(null);
+    setSelectedMatchupKey(record.matchupKey);
+    setScreen('activeGame');
+  }
+
+  function handlePlayAgainFromHistory(record: CompletedGameRecord) {
+    if (continuableGame) {
+      Alert.alert(
+        'Yeni oyun başlatılsın mı?',
+        'Mevcut aktif oyun silinir ve skorlar kaybolur. Geçmiş kayıtlar korunur.',
+        [
+          { text: 'Vazgeç', style: 'cancel' },
+          {
+            text: 'Başlat',
+            style: 'destructive',
+            onPress: () => startFromCompletedRecord(record),
+          },
+        ],
+      );
+      return;
+    }
+    startFromCompletedRecord(record);
+  }
+
   return (
     <>
       {screen === 'home' ? (
@@ -288,12 +320,14 @@ export default function App() {
             setSelectedCompletedGameId(gameId);
             setScreen('completedGameDetail');
           }}
+          onPlayAgain={handlePlayAgainFromHistory}
         />
       ) : null}
       {screen === 'completedGameDetail' && selectedCompletedGameId ? (
         <CompletedGameDetailScreen
           gameId={selectedCompletedGameId}
           onBack={() => setScreen('tournamentDetail')}
+          onPlayAgain={handlePlayAgainFromHistory}
         />
       ) : null}
       {screen === 'about' ? (

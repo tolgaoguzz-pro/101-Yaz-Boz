@@ -11,18 +11,21 @@ import { useEffect, useState } from 'react';
 import { CompletedGameRecord } from '../../domain/completedGame';
 import { getCompletedGameById } from '../../persistence/completedGameRepository';
 import { GameActivityLogView } from '../components/GameActivityLogView';
-import { gameModeLabel } from '../gameMode';
+import { PrimaryButton } from '../components/PrimaryButton';
+import { gameModeLabel, resolveGameMode } from '../gameMode';
 import { formatSafeDateTime } from '../tournamentPresentation';
 import { colors, radii, spacing, typography } from '../theme';
 
 type CompletedGameDetailScreenProps = {
   gameId: string;
   onBack: () => void;
+  onPlayAgain: (record: CompletedGameRecord) => void;
 };
 
 export function CompletedGameDetailScreen({
   gameId,
   onBack,
+  onPlayAgain,
 }: CompletedGameDetailScreenProps) {
   const [record, setRecord] = useState<CompletedGameRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -124,6 +127,15 @@ export function CompletedGameDetailScreen({
                 </View>
               ))}
             </View>
+
+            <PrimaryButton
+              label={
+                resolveGameMode(record.gameMode) === 'individual'
+                  ? 'Bu Oyuncularla Yeni Oyun'
+                  : 'Bu Takımlarla Yeni Oyun'
+              }
+              onPress={() => onPlayAgain(record)}
+            />
 
             <Text style={styles.section}>Oyun Günlüğü</Text>
             <GameActivityLogView

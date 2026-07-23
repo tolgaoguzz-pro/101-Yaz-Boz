@@ -297,3 +297,24 @@ export function createRematchGame(game: ActiveGameData): ActiveGameData {
     completedGameRecordId: undefined,
   };
 }
+
+/**
+ * Tamamlanmış geçmiş kaydından aynı kadro/mod ile yeni aktif oyun.
+ * Eski completed record değişmez; matchupKey aynı kalır.
+ */
+export function createGameFromCompletedRecord(record: {
+  teams: [ActiveGameTeam, ActiveGameTeam];
+  gameMode: GameMode | unknown;
+  targetRoundCount: number;
+}): ActiveGameData {
+  return createRematchGame({
+    teams: record.teams,
+    roundNumber: 1,
+    rounds: [],
+    lastAction: null,
+    activityLog: [],
+    targetRoundCount: record.targetRoundCount,
+    gameMode: resolveGameMode(record.gameMode),
+    status: 'completed',
+  });
+}
