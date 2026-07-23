@@ -18,11 +18,16 @@ import {
 } from '../../engine/calculateRound';
 import { DEFAULT_SCORE_RULES } from '../../engine/rules';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { resolveGameMode } from '../gameMode';
 import {
   buildRosterFromActiveGame,
   playersFromActiveGame,
   teamNameFromActiveGame,
 } from '../gameRoster';
+import {
+  calculateIndividualRound,
+  playerIdFromIndividualTeamId,
+} from '../individualRound';
 import {
   buildRoundInputFromForm,
   createInitialRoundEntryForm,
@@ -102,6 +107,7 @@ export function RoundEntryScreen({
 }: RoundEntryScreenProps) {
   const rosterPlayers = useMemo(() => playersFromActiveGame(game), [game]);
   const engineRoster = useMemo(() => buildRosterFromActiveGame(game), [game]);
+  const isIndividual = resolveGameMode(game.gameMode) === 'individual';
 
   const [form, setForm] = useState<RoundEntryForm>(() =>
     createInitialRoundEntryForm(rosterPlayers),
@@ -184,11 +190,9 @@ export function RoundEntryScreen({
         form,
         `round-${game.roundNumber}`,
       );
-      const result = calculateRound(
-        roundInput,
-        DEFAULT_SCORE_RULES,
-        engineRoster,
-      );
+      const result = isIndividual
+        ? calculateIndividualRound(roundInput, game, DEFAULT_SCORE_RULES)
+        : calculateRound(roundInput, DEFAULT_SCORE_RULES, engineRoster);
       setError(null);
       setPreview(result);
     } catch (caught) {
@@ -380,7 +384,9 @@ export function RoundEntryScreen({
               <View style={styles.resultCard}>
                 <Text style={styles.resultTitle}>El Sonucu</Text>
                 <Text style={styles.resultHint}>
-                  Bitiren 0 puan görünür; bu normaldir.
+                  {isIndividual
+                    ? 'Bitiren 0 puan alır; bitiş bonusu yalnız bitirene yazılır.'
+                    : 'Bitiren 0 puan görünür; bu normaldir.'}
                 </Text>
                 {preview.players.map((playerScore) => (
                   <View key={playerScore.playerId} style={styles.resultRow}>
@@ -391,29 +397,51 @@ export function RoundEntryScreen({
                     <Text style={styles.resultValue}>{playerScore.score}</Text>
                   </View>
                 ))}
-                <View style={styles.resultDivider} />
-                {preview.teams.map((teamScore) => (
-                  <View key={teamScore.teamId} style={styles.resultRow}>
-                    <Text style={styles.resultName}>
-                      {teamNameFromActiveGame(game, teamScore.teamId)}
-                    </Text>
-                    <Text style={styles.resultValue}>{teamScore.score}</Text>
-                  </View>
-                ))}
-                {preview.finishTeamBonus.teamId !== null ? (
-                  <View style={styles.resultRow}>
-                    <Text style={styles.resultName}>
-                      Bonus ·{' '}
-                      {teamNameFromActiveGame(
-                        game,
-                        preview.finishTeamBonus.teamId,
-                      )}
-                    </Text>
-                    <Text style={styles.resultValue}>
-                      {preview.finishTeamBonus.amount}
-                    </Text>
-                  </View>
-                ) : null}
+                {isIndividual ? (
+                  preview.finishTeamBonus.amount !== 0 ? (
+                    <View style={styles.resultRow}>
+                      <Text style={styles.resultName}>
+                        Bitiş bonusu ·{' '}
+                        {nameByPlayerId.get(
+                          playerIdFromIndividualTeamId(
+                            preview.finishTeamBonus.teamId,
+                          ) ?? '',
+                        ) ?? 'Bitiren'}
+                      </Text>
+                      <Text style={styles.resultValue}>
+                        {preview.finishTeamBonus.amount}
+                      </Text>
+                    </View>
+                  ) : null
+                ) : (
+                  <>
+                    <View style={styles.resultDivider} />
+                    {preview.teams.map((teamScore) => (
+                      <View key={teamScore.teamId} style={styles.resultRow}>
+                        <Text style={styles.resultName}>
+                          {teamNameFromActiveGame(game, teamScore.teamId)}
+                        </Text>
+                        <Text style={styles.resultValue}>
+                          {teamScore.score}
+                        </Text>
+                      </View>
+                    ))}
+                    {preview.finishTeamBonus.teamId !== null ? (
+                      <View style={styles.resultRow}>
+                        <Text style={styles.resultName}>
+                          Bonus ·{' '}
+                          {teamNameFromActiveGame(
+                            game,
+                            preview.finishTeamBonus.teamId,
+                          )}
+                        </Text>
+                        <Text style={styles.resultValue}>
+                          {preview.finishTeamBonus.amount}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </>
+                )}
               </View>
             ) : null}
             </Pressable>

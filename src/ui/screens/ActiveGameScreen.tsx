@@ -8,10 +8,10 @@ import {
   View,
 } from 'react-native';
 
+import type { GameMode } from '../gameMode';
 import { TEAM_IDS } from '../gameRoster';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SecondaryButton } from '../components/SecondaryButton';
-import type { GameMode } from '../gameMode';
 import {
   remainingRoundCount,
   resolveTargetRoundCount,
@@ -35,6 +35,10 @@ export type SavedRoundSummary = {
   players: { playerId: string; score: number }[];
   teams: { teamId: string; score: number }[];
   finishTeamBonus: { teamId: string | null; amount: number };
+  /** El kaydındaki oyun modu (eski kayıtlarda yok). */
+  gameMode?: GameMode;
+  /** Tekli: bitiş bonusunun uygulandığı oyuncu. */
+  finishBonusPlayerId?: string | null;
 };
 
 export type LastGameAction = {

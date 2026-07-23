@@ -11,7 +11,10 @@ import {
   CalculateRoundResult,
   FinishTeamBonusResult,
 } from './types';
-import { validateRoundInput } from './validateRoundInput';
+import {
+  validateRoundInput,
+  ValidateRoundInputOptions,
+} from './validateRoundInput';
 
 export type {
   CalculateRoundResult,
@@ -20,15 +23,19 @@ export type {
   TeamRoundScore,
 } from './types';
 
+export type CalculateRoundOptions = ValidateRoundInputOptions;
+
 /**
  * @param roster Game players with teamId — used for teams, partners, and opponents.
+ * @param options.teamStructure paired (default) or any (individual solo teams).
  */
 export function calculateRound(
   input: RoundInput,
   rules: ScoreRules,
   roster: Player[],
+  options: CalculateRoundOptions = {},
 ): CalculateRoundResult {
-  validateRoundInput(input, roster);
+  validateRoundInput(input, roster, options);
 
   const { finishType, finisherPlayerId } = input.finish;
   const finishMultiplier = opponentFinishMultiplier(finishType, rules);

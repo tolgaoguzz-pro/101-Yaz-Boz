@@ -1,8 +1,17 @@
 import { Player, RoundInput } from './models';
 
+export type ValidateRoundInputOptions = {
+  /**
+   * paired (varsayılan): tam 2 takım × 2 oyuncu.
+   * any: yalnızca her oyuncuda teamId olsun (tekli orchestration).
+   */
+  teamStructure?: 'paired' | 'any';
+};
+
 export function validateRoundInput(
   input: RoundInput,
   roster: Player[],
+  options: ValidateRoundInputOptions = {},
 ): void {
   if (input.players.length !== 4) {
     throw new Error(
@@ -53,19 +62,22 @@ export function validateRoundInput(
     return player.teamId;
   });
 
-  const uniqueTeamIds = [...new Set(teamIds)];
-  if (uniqueTeamIds.length !== 2) {
-    throw new Error(
-      `Roster must contain exactly 2 teams, got ${uniqueTeamIds.length}.`,
-    );
-  }
-
-  for (const teamId of uniqueTeamIds) {
-    const count = teamIds.filter((id) => id === teamId).length;
-    if (count !== 2) {
+  const teamStructure = options.teamStructure ?? 'paired';
+  if (teamStructure === 'paired') {
+    const uniqueTeamIds = [...new Set(teamIds)];
+    if (uniqueTeamIds.length !== 2) {
       throw new Error(
-        `Team "${teamId}" must have exactly 2 players, got ${count}.`,
+        `Roster must contain exactly 2 teams, got ${uniqueTeamIds.length}.`,
       );
+    }
+
+    for (const teamId of uniqueTeamIds) {
+      const count = teamIds.filter((id) => id === teamId).length;
+      if (count !== 2) {
+        throw new Error(
+          `Team "${teamId}" must have exactly 2 players, got ${count}.`,
+        );
+      }
     }
   }
 

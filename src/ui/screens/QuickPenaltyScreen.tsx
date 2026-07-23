@@ -10,6 +10,7 @@ import {
 
 import { DEFAULT_SCORE_RULES } from '../../engine/rules';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { resolveGameMode } from '../gameMode';
 import { playersFromActiveGame } from '../gameRoster';
 import { colors, radii, spacing, typography } from '../theme';
 import { ActiveGameData } from './ActiveGameScreen';
@@ -108,6 +109,7 @@ export function QuickPenaltyScreen({
   onApply,
 }: QuickPenaltyScreenProps) {
   const players = useMemo(() => playersFromActiveGame(game), [game]);
+  const isIndividual = resolveGameMode(game.gameMode) === 'individual';
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [kind, setKind] = useState<QuickPenaltyKind | null>(null);
   const [manualText, setManualText] = useState('101');
@@ -158,7 +160,11 @@ export function QuickPenaltyScreen({
             <Text style={styles.title}>Ceza Ekle</Text>
           </View>
 
-          <Text style={styles.subtitle}>Oyuncuyu ve ceza türünü seç.</Text>
+          <Text style={styles.subtitle}>
+            {isIndividual
+              ? 'Oyuncuyu ve ceza türünü seç. Ceza yalnız seçilen oyuncuya yazılır.'
+              : 'Oyuncuyu ve ceza türünü seç.'}
+          </Text>
 
           <Text style={styles.sectionTitle}>Oyuncu</Text>
           <View style={styles.grid}>

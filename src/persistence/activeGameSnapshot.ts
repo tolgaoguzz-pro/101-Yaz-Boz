@@ -5,7 +5,7 @@ import {
   LastGameAction,
   SavedRoundSummary,
 } from '../ui/screens/ActiveGameScreen';
-import { resolveGameMode } from '../ui/gameMode';
+import { resolveGameMode, isGameMode } from '../ui/gameMode';
 import { isGameComplete } from '../ui/gameResult';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -99,7 +99,7 @@ function parseRoundSummary(value: unknown): SavedRoundSummary | null {
     return null;
   }
 
-  return {
+  const summary: SavedRoundSummary = {
     roundNumber: value.roundNumber,
     players,
     teams,
@@ -108,6 +108,19 @@ function parseRoundSummary(value: unknown): SavedRoundSummary | null {
       amount: value.finishTeamBonus.amount,
     },
   };
+
+  if (isGameMode(value.gameMode)) {
+    summary.gameMode = value.gameMode;
+  }
+
+  if (
+    value.finishBonusPlayerId === null ||
+    typeof value.finishBonusPlayerId === 'string'
+  ) {
+    summary.finishBonusPlayerId = value.finishBonusPlayerId;
+  }
+
+  return summary;
 }
 
 function parseLastAction(value: unknown): LastGameAction | null {
