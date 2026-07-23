@@ -1,6 +1,6 @@
 import { calculateRound } from '../calculateRound';
 import { Player, PlayerRoundInput, RoundInput } from '../models';
-import { DEFAULT_SCORE_RULES } from '../rules';
+import { DEFAULT_SCORE_RULES, ScoreRules } from '../rules';
 
 const roster: Player[] = [
   { id: 'p1', name: 'P1', teamId: 't1' },
@@ -43,6 +43,31 @@ function scoreOf(
     throw new Error(`Missing score for ${playerId}`);
   }
   return entry.score;
+}
+
+function teamScoreOf(
+  result: ReturnType<typeof calculateRound>,
+  teamId: string,
+): number {
+  const entry = result.teams.find((team) => team.teamId === teamId);
+  if (!entry) {
+    throw new Error(`Missing score for team ${teamId}`);
+  }
+  return entry.score;
+}
+
+/** p1 finishes for t1; p2 partner; p3/p4 opponents with known base+extras. */
+function finishedRoundPlayers(): PlayerRoundInput[] {
+  return [
+    playerInput({ playerId: 'p1', remainingTilePoints: 10 }),
+    playerInput({ playerId: 'p2', remainingTilePoints: 30 }),
+    playerInput({
+      playerId: 'p3',
+      remainingTilePoints: 50,
+      remainingOkeyCount: 1,
+    }),
+    playerInput({ playerId: 'p4', remainingTilePoints: 20 }),
+  ];
 }
 
 describe('calculateRound', () => {
@@ -180,5 +205,113 @@ describe('calculateRound', () => {
 
     expect(result.finishTeamBonus).toEqual({ teamId: 't1', amount: -101 });
     expect(result.teams.find((team) => team.teamId === 't1')?.score).toBe(-101);
+  });
+
+  it('multiplies opponent penalties by 2 and applies -202 bonus on okey finish', () => {
+    const result = calculateRound(
+      roundWithPlayers(finishedRoundPlayers(), {
+        finishType: 'okey',
+        finisherPlayerId: 'p1',
+      }),
+      DEFAULT_SCORE_RULES,
+      roster,
+    );
+
+    // opponents: (50+101)*2=302, 20*2=40; finisher/partner default 0
+    expect(scoreOf(result, 'p1')).toBe(0);
+    expect(scoreOf(result, 'p2')).toBe(0);
+    expect(scoreOf(result, 'p3')).toBe(302);
+    expect(scoreOf(result, 'p4')).toBe(40);
+
+    expect(result.finishTeamBonus).toEqual({ teamId: 't1', amount: -202 });
+    expect(teamScoreOf(result, 't1')).toBe(-202);
+    expect(teamScoreOf(result, 't2')).toBe(342);
+  });
+
+  it('multiplies opponent penalties by 2 and applies -202 bonus on fromHand finish', () => {
+    const result = calculateRound(
+      roundWithPlayers(finishedRoundPlayers(), {
+        finishType: 'fromHand',
+        finisherPlayerId: 'p1',
+      }),
+      DEFAULT_SCORE_RULES,
+      roster,
+    );
+
+    expect(scoreOf(result, 'p1')).toBe(0);
+    expect(scoreOf(result, 'p2')).toBe(0);
+    expect(scoreOf(result, 'p3')).toBe(302);
+    expect(scoreOf(result, 'p4')).toBe(40);
+
+    expect(result.finishTeamBonus).toEqual({ teamId: 't1', amount: -202 });
+    expect(teamScoreOf(result, 't1')).toBe(-202);
+    expect(teamScoreOf(result, 't2')).toBe(342);
+  });
+
+  it('multiplies opponent penalties by 4 and applies -404 bonus on fromHandAndOkey finish', () => {
+    const result = calculateRound(
+      roundWithPlayers(finishedRoundPlayers(), {
+        finishType: 'fromHandAndOkey',
+        finisherPlayerId: 'p1',
+      }),
+      DEFAULT_SCORE_RULES,
+      roster,
+    );
+
+    // opponents: (50+101)*4=604, 20*4=80
+    expect(scoreOf(result, 'p1')).toBe(0);
+    expect(scoreOf(result, 'p2')).toBe(0);
+    expect(scoreOf(result, 'p3')).toBe(604);
+    expect(scoreOf(result, 'p4')).toBe(80);
+
+    expect(result.finishTeamBonus).toEqual({ teamId: 't1', amount: -404 });
+    expect(teamScoreOf(result, 't1')).toBe(-404);
+    expect(teamScoreOf(result, 't2')).toBe(684);
+  });
+
+  it('multiplies only the base penalty when extraPenaltyTiming is afterFinishMultiplier', () => {
+    const rules: ScoreRules = {
+      ...DEFAULT_SCORE_RULES,
+      extraPenaltyTiming: 'afterFinishMultiplier',
+    };
+
+    const result = calculateRound(
+      roundWithPlayers(finishedRoundPlayers(), {
+        finishType: 'okey',
+        finisherPlayerId: 'p1',
+      }),
+      rules,
+      roster,
+    );
+
+    // opponents: 50*2+101=201, 20*2+0=40 (extras not multiplied)
+    expect(scoreOf(result, 'p1')).toBe(0);
+    expect(scoreOf(result, 'p2')).toBe(0);
+    expect(scoreOf(result, 'p3')).toBe(201);
+    expect(scoreOf(result, 'p4')).toBe(40);
+
+    expect(result.finishTeamBonus).toEqual({ teamId: 't1', amount: -202 });
+    expect(teamScoreOf(result, 't1')).toBe(-202);
+    expect(teamScoreOf(result, 't2')).toBe(241);
+  });
+
+  it('applies no finish multiplier or team bonus when finishType is none', () => {
+    const result = calculateRound(
+      roundWithPlayers(finishedRoundPlayers(), {
+        finishType: 'none',
+        finisherPlayerId: null,
+      }),
+      DEFAULT_SCORE_RULES,
+      roster,
+    );
+
+    expect(scoreOf(result, 'p1')).toBe(10);
+    expect(scoreOf(result, 'p2')).toBe(30);
+    expect(scoreOf(result, 'p3')).toBe(151);
+    expect(scoreOf(result, 'p4')).toBe(20);
+
+    expect(result.finishTeamBonus).toEqual({ teamId: null, amount: 0 });
+    expect(teamScoreOf(result, 't1')).toBe(40);
+    expect(teamScoreOf(result, 't2')).toBe(171);
   });
 });
