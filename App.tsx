@@ -7,8 +7,9 @@ import {
 } from './src/ui/screens/ActiveGameScreen';
 import { HomeScreen } from './src/ui/screens/HomeScreen';
 import { NewGameScreen } from './src/ui/screens/NewGameScreen';
+import { RoundEntryScreen } from './src/ui/screens/RoundEntryScreen';
 
-type Screen = 'home' | 'newGame' | 'activeGame';
+type Screen = 'home' | 'newGame' | 'activeGame' | 'roundEntry';
 
 /** Yeni Oyun'dan Aktif Oyun'a taşınan geçici masa verisi. */
 type TemporaryActiveGame = ActiveGameData;
@@ -43,7 +44,13 @@ export default function App() {
         <ActiveGameScreen
           game={activeGame}
           onHome={handleHome}
-          onNewRound={() => console.log('Yeni El')}
+          onNewRound={() => setScreen('roundEntry')}
+        />
+      ) : null}
+      {screen === 'roundEntry' && activeGame ? (
+        <RoundEntryScreen
+          game={activeGame}
+          onBack={() => setScreen('activeGame')}
         />
       ) : null}
       <StatusBar style="dark" />
