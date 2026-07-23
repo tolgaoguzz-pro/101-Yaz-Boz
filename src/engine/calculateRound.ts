@@ -16,9 +16,20 @@ export type PlayerRoundScore = {
   score: number;
 };
 
+export type TeamRoundScore = {
+  teamId: string;
+  score: number;
+};
+
+export type FinishTeamBonusResult = {
+  teamId: string | null;
+  amount: number;
+};
+
 export type CalculateRoundResult = {
   players: PlayerRoundScore[];
-  finishTeamBonus: number;
+  teams: TeamRoundScore[];
+  finishTeamBonus: FinishTeamBonusResult;
 };
 
 function basePenalty(
@@ -65,7 +76,10 @@ function opponentFinishMultiplier(
   }
 }
 
-function finishTeamBonus(finishType: FinishType, rules: ScoreRules): number {
+function finishTeamBonusAmount(
+  finishType: FinishType,
+  rules: ScoreRules,
+): number {
   switch (finishType) {
     case 'normal':
       return rules.finishTeamBonus.normal;
@@ -80,49 +94,15 @@ function finishTeamBonus(finishType: FinishType, rules: ScoreRules): number {
   }
 }
 
-function findTeamId(roster: Player[], playerId: string): string | null {
+function requireTeamId(roster: Player[], playerId: string): string {
   const player = roster.find((entry) => entry.id === playerId);
-  return player ? player.teamId : null;
-}
-
-function isOpponent(
-  playerId: string,
-  finisherPlayerId: string | null,
-  roster: Player[],
-): boolean {
-  if (finisherPlayerId === null) {
-    return false;
+  if (!player) {
+    throw new Error(`Player "${playerId}" is not in the roster.`);
   }
-
-  const finisherTeamId = findTeamId(roster, finisherPlayerId);
-  const playerTeamId = findTeamId(roster, playerId);
-
-  if (finisherTeamId === null || playerTeamId === null) {
-    return false;
+  if (!player.teamId) {
+    throw new Error(`Player "${playerId}" is missing a teamId.`);
   }
-
-  return playerTeamId !== finisherTeamId;
-}
-
-function playerScore(
-  player: PlayerRoundInput,
-  rules: ScoreRules,
-  applyFinishMultiplier: boolean,
-  finishMultiplier: number,
-): number {
-  const base = basePenalty(player, rules.openBase);
-  const extras = handExtrasPenalty(player, rules.handExtras);
-
-  if (!applyFinishMultiplier) {
-    return base + extras;
-  }
-
-  return applyExtrasWithFinishMultiplier(
-    base,
-    extras,
-    finishMultiplier,
-    rules.extraPenaltyTiming,
-  );
+  return player.teamId;
 }
 
 function applyExtrasWithFinishMultiplier(
@@ -139,37 +119,206 @@ function applyExtrasWithFinishMultiplier(
   }
 }
 
+function validateRoundInput(
+  input: RoundInput,
+  roster: Player[],
+): void {
+  if (input.players.length !== 4) {
+    throw new Error(
+      `Round must contain exactly 4 players, got ${input.players.length}.`,
+    );
+  }
+
+  if (roster.length !== 4) {
+    throw new Error(
+      `Roster must contain exactly 4 players, got ${roster.length}.`,
+    );
+  }
+
+  const roundIds = input.players.map((player) => player.playerId);
+  const rosterIds = roster.map((player) => player.id);
+
+  if (new Set(roundIds).size !== 4) {
+    throw new Error('Round playerIds must be unique.');
+  }
+
+  if (new Set(rosterIds).size !== 4) {
+    throw new Error('Roster player ids must be unique.');
+  }
+
+  const roundIdSet = new Set(roundIds);
+  const rosterIdSet = new Set(rosterIds);
+
+  for (const id of roundIds) {
+    if (!rosterIdSet.has(id)) {
+      throw new Error(
+        `Round playerId "${id}" is missing from the roster.`,
+      );
+    }
+  }
+
+  for (const id of rosterIds) {
+    if (!roundIdSet.has(id)) {
+      throw new Error(
+        `Roster player "${id}" is missing from the round input.`,
+      );
+    }
+  }
+
+  const teamIds = roster.map((player) => {
+    if (!player.teamId) {
+      throw new Error(`Player "${player.id}" is missing a teamId.`);
+    }
+    return player.teamId;
+  });
+
+  const uniqueTeamIds = [...new Set(teamIds)];
+  if (uniqueTeamIds.length !== 2) {
+    throw new Error(
+      `Roster must contain exactly 2 teams, got ${uniqueTeamIds.length}.`,
+    );
+  }
+
+  for (const teamId of uniqueTeamIds) {
+    const count = teamIds.filter((id) => id === teamId).length;
+    if (count !== 2) {
+      throw new Error(
+        `Team "${teamId}" must have exactly 2 players, got ${count}.`,
+      );
+    }
+  }
+
+  const { finishType, finisherPlayerId } = input.finish;
+
+  if (finishType === 'none') {
+    if (finisherPlayerId !== null) {
+      throw new Error(
+        'finisherPlayerId must be null when finishType is "none".',
+      );
+    }
+    return;
+  }
+
+  if (finisherPlayerId === null) {
+    throw new Error(
+      `finisherPlayerId is required when finishType is "${finishType}".`,
+    );
+  }
+
+  if (!rosterIdSet.has(finisherPlayerId)) {
+    throw new Error(
+      `finisherPlayerId "${finisherPlayerId}" is not in the roster.`,
+    );
+  }
+}
+
+function scoreForPlayer(
+  player: PlayerRoundInput,
+  rules: ScoreRules,
+  finishType: FinishType,
+  finisherPlayerId: string | null,
+  finisherTeamId: string | null,
+  finishMultiplier: number,
+  roster: Player[],
+): number {
+  const base = basePenalty(player, rules.openBase);
+  const extras = handExtrasPenalty(player, rules.handExtras);
+
+  if (finishType === 'none') {
+    return base + extras;
+  }
+
+  if (player.playerId === finisherPlayerId) {
+    return 0;
+  }
+
+  const playerTeamId = requireTeamId(roster, player.playerId);
+
+  if (finisherTeamId !== null && playerTeamId === finisherTeamId) {
+    switch (rules.finisherPartner.penaltyMode) {
+      case 'fixed':
+        return rules.finisherPartner.fixedPenalty;
+      case 'calculated':
+        return base + extras;
+    }
+  }
+
+  return applyExtrasWithFinishMultiplier(
+    base,
+    extras,
+    finishMultiplier,
+    rules.extraPenaltyTiming,
+  );
+}
+
 /**
- * @param roster Game players with teamId — used to detect opponents of the finisher.
+ * @param roster Game players with teamId — used for teams, partners, and opponents.
  */
 export function calculateRound(
   input: RoundInput,
   rules: ScoreRules,
   roster: Player[],
 ): CalculateRoundResult {
+  validateRoundInput(input, roster);
+
   const { finishType, finisherPlayerId } = input.finish;
   const finishMultiplier = opponentFinishMultiplier(finishType, rules);
+  const finisherTeamId =
+    finisherPlayerId === null
+      ? null
+      : requireTeamId(roster, finisherPlayerId);
 
-  const players = input.players.map((player) => {
-    const applyFinishMultiplier = isOpponent(
-      player.playerId,
+  const players = input.players.map((player) => ({
+    playerId: player.playerId,
+    score: scoreForPlayer(
+      player,
+      rules,
+      finishType,
       finisherPlayerId,
+      finisherTeamId,
+      finishMultiplier,
       roster,
-    );
+    ),
+  }));
 
-    return {
-      playerId: player.playerId,
-      score: playerScore(
-        player,
-        rules,
-        applyFinishMultiplier,
-        finishMultiplier,
-      ),
-    };
+  const amount =
+    finishType === 'none' ? 0 : finishTeamBonusAmount(finishType, rules);
+  const finishTeamBonus: FinishTeamBonusResult = {
+    teamId: finishType === 'none' ? null : finisherTeamId,
+    amount,
+  };
+
+  const teamIdsInOrder: string[] = [];
+  for (const entry of roster) {
+    if (!teamIdsInOrder.includes(entry.teamId)) {
+      teamIdsInOrder.push(entry.teamId);
+    }
+  }
+
+  const scoreByPlayerId = new Map(
+    players.map((player) => [player.playerId, player.score]),
+  );
+
+  const teams: TeamRoundScore[] = teamIdsInOrder.map((teamId) => {
+    const teamPlayerIds = roster
+      .filter((entry) => entry.teamId === teamId)
+      .map((entry) => entry.id);
+
+    let score = 0;
+    for (const playerId of teamPlayerIds) {
+      score += scoreByPlayerId.get(playerId) ?? 0;
+    }
+
+    if (finishTeamBonus.teamId === teamId) {
+      score += finishTeamBonus.amount;
+    }
+
+    return { teamId, score };
   });
 
   return {
     players,
-    finishTeamBonus: finishTeamBonus(finishType, rules),
+    teams,
+    finishTeamBonus,
   };
 }
