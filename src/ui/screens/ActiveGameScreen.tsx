@@ -7,9 +7,15 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { useMemo } from 'react';
 
 import type { GameMode } from '../gameMode';
+import { resolveGameMode } from '../gameMode';
 import { TEAM_IDS } from '../gameRoster';
+import {
+  rankPlayersByPenaltyAscending,
+  rosterPlayersInOrder,
+} from '../gameResult';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SecondaryButton } from '../components/SecondaryButton';
 import {
@@ -117,21 +123,45 @@ function TeamCard({
   );
 }
 
+function IndividualStandingsCard({ game }: { game: ActiveGameData }) {
+  const standings = useMemo(
+    () => rankPlayersByPenaltyAscending(rosterPlayersInOrder(game)),
+    [game],
+  );
+
+  return (
+    <View style={styles.individualCard}>
+      <Text style={styles.individualHint}>Düşük puan avantajlıdır</Text>
+      <View style={styles.individualList}>
+        {standings.map((row) => (
+          <View key={row.playerId} style={styles.individualRow}>
+            <Text style={styles.individualLine} numberOfLines={1}>
+              {row.rank}. {row.name} — {row.totalScore}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function RoundHistoryItem({
   round,
   game,
   isLatest,
   showDivider,
+  isIndividual,
 }: {
   round: SavedRoundSummary;
   game: ActiveGameData;
   isLatest: boolean;
   showDivider: boolean;
+  isIndividual: boolean;
 }) {
-  const rosterPlayers = [
-    ...game.teams[0].players,
-    ...game.teams[1].players,
-  ];
+  const rosterPlayers = rosterPlayersInOrder(game);
+  const bonusPlayer = round.finishBonusPlayerId
+    ? rosterPlayers.find((player) => player.id === round.finishBonusPlayerId)
+    : null;
 
   return (
     <View>
@@ -151,25 +181,37 @@ function RoundHistoryItem({
           ))}
         </View>
 
-        <Text style={styles.teamTotalLabel}>Takım Toplamı:</Text>
-        <View style={styles.roundScores}>
-          <View style={styles.historyRow}>
-            <Text style={styles.historyName} numberOfLines={1}>
-              {game.teams[0].name}
+        {isIndividual ? (
+          round.finishBonusPlayerId &&
+          round.finishTeamBonus.amount !== 0 ? (
+            <Text style={styles.bonusLine}>
+              Bitiş bonusu · {bonusPlayer?.name ?? 'Bitiren'}{' '}
+              {round.finishTeamBonus.amount}
             </Text>
-            <Text style={styles.historyScore}>
-              {scoreByTeamId(round, TEAM_IDS.team1)}
-            </Text>
-          </View>
-          <View style={styles.historyRow}>
-            <Text style={styles.historyName} numberOfLines={1}>
-              {game.teams[1].name}
-            </Text>
-            <Text style={styles.historyScore}>
-              {scoreByTeamId(round, TEAM_IDS.team2)}
-            </Text>
-          </View>
-        </View>
+          ) : null
+        ) : (
+          <>
+            <Text style={styles.teamTotalLabel}>Takım Toplamı:</Text>
+            <View style={styles.roundScores}>
+              <View style={styles.historyRow}>
+                <Text style={styles.historyName} numberOfLines={1}>
+                  {game.teams[0].name}
+                </Text>
+                <Text style={styles.historyScore}>
+                  {scoreByTeamId(round, TEAM_IDS.team1)}
+                </Text>
+              </View>
+              <View style={styles.historyRow}>
+                <Text style={styles.historyName} numberOfLines={1}>
+                  {game.teams[1].name}
+                </Text>
+                <Text style={styles.historyScore}>
+                  {scoreByTeamId(round, TEAM_IDS.team2)}
+                </Text>
+              </View>
+            </View>
+          </>
+        )}
       </View>
       {showDivider ? <View style={styles.roundDivider} /> : null}
     </View>
@@ -184,6 +226,7 @@ export function ActiveGameScreen({
 }: ActiveGameScreenProps) {
   const { width } = useWindowDimensions();
   const stacked = width < 380;
+  const isIndividual = resolveGameMode(game.gameMode) === 'individual';
   const playedRounds = game.rounds.length;
   const lastRoundIndex = playedRounds - 1;
   const targetRounds = resolveTargetRoundCount(game.targetRoundCount);
@@ -217,10 +260,14 @@ export function ActiveGameScreen({
             </View>
           </View>
 
-          <View style={[styles.teamsRow, stacked && styles.teamsColumn]}>
-            <TeamCard team={game.teams[0]} stacked={stacked} />
-            <TeamCard team={game.teams[1]} stacked={stacked} />
-          </View>
+          {isIndividual ? (
+            <IndividualStandingsCard game={game} />
+          ) : (
+            <View style={[styles.teamsRow, stacked && styles.teamsColumn]}>
+              <TeamCard team={game.teams[0]} stacked={stacked} />
+              <TeamCard team={game.teams[1]} stacked={stacked} />
+            </View>
+          )}
 
           {game.lastAction ? (
             <View style={styles.lastActionCard}>
@@ -250,6 +297,7 @@ export function ActiveGameScreen({
                 game={game}
                 isLatest={index === lastRoundIndex}
                 showDivider={index < lastRoundIndex}
+                isIndividual={isIndividual}
               />
             ))
           )}
@@ -383,6 +431,34 @@ const styles = StyleSheet.create({
     ...typography.buttonSecondary,
     color: colors.textSecondary,
   },
+  individualCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.xs,
+  },
+  individualHint: {
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 16,
+    color: colors.primaryMuted,
+  },
+  individualList: {
+    gap: 2,
+  },
+  individualRow: {
+    minHeight: 24,
+    justifyContent: 'center',
+  },
+  individualLine: {
+    fontSize: 16,
+    fontWeight: '600',
+    lineHeight: 22,
+    color: colors.text,
+  },
   lastActionCard: {
     backgroundColor: colors.surfaceElevated,
     borderRadius: radii.md,
@@ -461,6 +537,13 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   teamTotalLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+    color: colors.primaryMuted,
+    marginTop: 4,
+  },
+  bonusLine: {
     fontSize: 13,
     fontWeight: '600',
     lineHeight: 18,

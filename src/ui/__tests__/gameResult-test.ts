@@ -2,11 +2,14 @@ import {
   ActiveGameData,
   ActiveGamePlayer,
   ActiveGameTeam,
+  SavedRoundSummary,
 } from '../screens/ActiveGameScreen';
 import {
   calculateGameResult,
   createRematchGame,
   isGameComplete,
+  rankPlayersByPenaltyAscending,
+  rosterPlayersInOrder,
 } from '../gameResult';
 
 function player(
@@ -25,6 +28,15 @@ function team(
   return { name, totalScore, players };
 }
 
+function makeRounds(count: number): SavedRoundSummary[] {
+  return Array.from({ length: count }, (_, index) => ({
+    roundNumber: index + 1,
+    players: [],
+    teams: [],
+    finishTeamBonus: { teamId: null, amount: 0 },
+  }));
+}
+
 function makeGame(overrides: Partial<ActiveGameData> = {}): ActiveGameData {
   const {
     teams: overrideTeams,
@@ -36,6 +48,7 @@ function makeGame(overrides: Partial<ActiveGameData> = {}): ActiveGameData {
     roundNumber: 13,
     lastAction: null,
     targetRoundCount: 12,
+    gameMode: 'paired',
     ...rest,
     teams: overrideTeams ?? [
       team('Oğuz Ailesi', 188, [
@@ -47,14 +60,7 @@ function makeGame(overrides: Partial<ActiveGameData> = {}): ActiveGameData {
         player('player-4', 'Mashhura', 50),
       ]),
     ],
-    rounds:
-      overrideRounds ??
-      Array.from({ length: 12 }, (_, index) => ({
-        roundNumber: index + 1,
-        players: [],
-        teams: [],
-        finishTeamBonus: { teamId: null, amount: 0 },
-      })),
+    rounds: overrideRounds ?? makeRounds(12),
   };
 }
 
@@ -75,12 +81,7 @@ describe('isGameComplete', () => {
       isGameComplete(
         makeGame({
           targetRoundCount: undefined,
-          rounds: Array.from({ length: 11 }, (_, index) => ({
-            roundNumber: index + 1,
-            players: [],
-            teams: [],
-            finishTeamBonus: { teamId: null, amount: 0 },
-          })),
+          rounds: makeRounds(11),
         }),
       ),
     ).toBe(false);
@@ -89,12 +90,7 @@ describe('isGameComplete', () => {
       isGameComplete(
         makeGame({
           targetRoundCount: undefined,
-          rounds: Array.from({ length: 12 }, (_, index) => ({
-            roundNumber: index + 1,
-            players: [],
-            teams: [],
-            finishTeamBonus: { teamId: null, amount: 0 },
-          })),
+          rounds: makeRounds(12),
         }),
       ),
     ).toBe(true);
@@ -105,28 +101,35 @@ describe('isGameComplete', () => {
       isGameComplete(
         makeGame({
           targetRoundCount: 8,
-          rounds: Array.from({ length: 8 }, (_, index) => ({
-            roundNumber: index + 1,
-            players: [],
-            teams: [],
-            finishTeamBonus: { teamId: null, amount: 0 },
-          })),
+          rounds: makeRounds(8),
         }),
       ),
     ).toBe(true);
   });
 });
 
-describe('calculateGameResult', () => {
-  it('picks the team with the higher total score as winner', () => {
+describe('calculateGameResult paired (lower penalty wins)', () => {
+  it('picks the team with the lower total score as winner', () => {
     const result = calculateGameResult(makeGame());
-    expect(result.winner).toEqual({
+    expect(result.mode).toBe('paired');
+    expect(result.pairedWinner).toEqual({
       kind: 'winner',
-      teamName: 'Oğuz Ailesi',
-      teamScore: 188,
-      otherTeamName: 'Güldiken Ailesi',
-      otherTeamScore: 120,
+      teamName: 'Güldiken Ailesi',
+      teamScore: 120,
+      otherTeamName: 'Oğuz Ailesi',
+      otherTeamScore: 188,
     });
+    expect(result.isTie).toBe(false);
+  });
+
+  it('treats the higher team score as the loser', () => {
+    const result = calculateGameResult(makeGame());
+    expect(result.pairedWinner?.kind).toBe('winner');
+    if (result.pairedWinner?.kind === 'winner') {
+      expect(result.pairedWinner.otherTeamScore).toBeGreaterThan(
+        result.pairedWinner.teamScore,
+      );
+    }
   });
 
   it('reports a tie when team totals are equal', () => {
@@ -145,30 +148,33 @@ describe('calculateGameResult', () => {
       }),
     );
 
-    expect(result.winner).toEqual({
+    expect(result.pairedWinner).toEqual({
       kind: 'tie',
       team1Name: 'Oğuz Ailesi',
       team1Score: 150,
       team2Name: 'Güldiken Ailesi',
       team2Score: 150,
     });
+    expect(result.isTie).toBe(true);
   });
 
-  it('ranks players by individual totalScore descending', () => {
+  it('ranks players by individual totalScore ascending', () => {
     const result = calculateGameResult(makeGame());
     expect(result.standings.map((row) => row.name)).toEqual([
-      'Tolga',
-      'Aygül',
-      'Şahin',
       'Mashhura',
+      'Şahin',
+      'Aygül',
+      'Tolga',
     ]);
     expect(result.standings.map((row) => row.rank)).toEqual([1, 2, 3, 4]);
-    expect(result.topScorer).toEqual({
-      rank: 1,
-      playerId: 'player-1',
-      name: 'Tolga',
-      totalScore: 100,
-    });
+    expect(result.firstPlacePlayers).toEqual([
+      {
+        rank: 1,
+        playerId: 'player-4',
+        name: 'Mashhura',
+        totalScore: 50,
+      },
+    ]);
   });
 
   it('keeps roster order when individual scores are tied', () => {
@@ -188,6 +194,114 @@ describe('calculateGameResult', () => {
     );
 
     expect(result.standings.map((row) => row.name)).toEqual([
+      'Tolga',
+      'Aygül',
+      'Şahin',
+      'Mashhura',
+    ]);
+    expect(result.firstPlacePlayers).toHaveLength(4);
+  });
+
+  it('falls back to paired when gameMode is undefined', () => {
+    const result = calculateGameResult(
+      makeGame({ gameMode: undefined }),
+    );
+    expect(result.mode).toBe('paired');
+    expect(result.pairedWinner).not.toBeNull();
+    expect(result.individualWinner).toBeNull();
+  });
+});
+
+describe('calculateGameResult individual', () => {
+  it('picks the lowest player score as winner', () => {
+    const result = calculateGameResult(
+      makeGame({
+        gameMode: 'individual',
+        teams: [
+          team('Takım 1', 0, [
+            player('player-1', 'Tolga', 42),
+            player('player-2', 'Aygül', 67),
+          ]),
+          team('Takım 2', 0, [
+            player('player-3', 'Şahin', 88),
+            player('player-4', 'Mashhura', 103),
+          ]),
+        ],
+      }),
+    );
+
+    expect(result.mode).toBe('individual');
+    expect(result.pairedWinner).toBeNull();
+    expect(result.individualWinner).toEqual({
+      kind: 'winner',
+      playerId: 'player-1',
+      name: 'Tolga',
+      totalScore: 42,
+    });
+    expect(result.standings.map((row) => row.name)).toEqual([
+      'Tolga',
+      'Aygül',
+      'Şahin',
+      'Mashhura',
+    ]);
+  });
+
+  it('reports a tie when multiple players share the lowest score', () => {
+    const result = calculateGameResult(
+      makeGame({
+        gameMode: 'individual',
+        teams: [
+          team('Takım 1', 0, [
+            player('player-1', 'Tolga', 40),
+            player('player-2', 'Aygül', 40),
+          ]),
+          team('Takım 2', 0, [
+            player('player-3', 'Şahin', 80),
+            player('player-4', 'Mashhura', 90),
+          ]),
+        ],
+      }),
+    );
+
+    expect(result.isTie).toBe(true);
+    expect(result.individualWinner).toEqual({
+      kind: 'tie',
+      players: [
+        { playerId: 'player-1', name: 'Tolga', totalScore: 40 },
+        { playerId: 'player-2', name: 'Aygül', totalScore: 40 },
+      ],
+    });
+  });
+});
+
+describe('active standings helpers', () => {
+  it('orders players low-to-high with stable roster ties', () => {
+    const game = makeGame({
+      gameMode: 'individual',
+      teams: [
+        team('Takım 1', 0, [
+          player('player-1', 'Tolga', 50),
+          player('player-2', 'Aygül', 40),
+        ]),
+        team('Takım 2', 0, [
+          player('player-3', 'Şahin', 40),
+          player('player-4', 'Mashhura', 60),
+        ]),
+      ],
+    });
+
+    const ranked = rankPlayersByPenaltyAscending(rosterPlayersInOrder(game));
+    expect(ranked.map((row) => row.name)).toEqual([
+      'Aygül',
+      'Şahin',
+      'Tolga',
+      'Mashhura',
+    ]);
+  });
+
+  it('keeps roster order for round history player lists', () => {
+    const game = makeGame({ gameMode: 'individual' });
+    expect(rosterPlayersInOrder(game).map((p) => p.name)).toEqual([
       'Tolga',
       'Aygül',
       'Şahin',
@@ -216,12 +330,7 @@ describe('createRematchGame', () => {
       'Şahin',
       'Mashhura',
     ]);
-    expect(rematch.teams[0].players.map((p) => p.totalScore)).toEqual([0, 0]);
-    expect(rematch.teams[1].players.map((p) => p.totalScore)).toEqual([0, 0]);
-    expect(rematch.teams[0].players.map((p) => p.id)).toEqual([
-      'player-1',
-      'player-2',
-    ]);
+    expect(rematch.gameMode).toBe('paired');
   });
 
   it('preserves targetRoundCount and falls back to 12 when missing', () => {
@@ -231,6 +340,37 @@ describe('createRematchGame', () => {
     expect(
       createRematchGame(makeGame({ targetRoundCount: undefined })).targetRoundCount,
     ).toBe(12);
+  });
+
+  it('preserves individual gameMode and roster on rematch', () => {
+    const rematch = createRematchGame(
+      makeGame({
+        gameMode: 'individual',
+        targetRoundCount: 8,
+        teams: [
+          team('Takım 1', 99, [
+            player('player-1', 'Tolga', 40),
+            player('player-2', 'Aygül', 59),
+          ]),
+          team('Takım 2', 80, [
+            player('player-3', 'Şahin', 30),
+            player('player-4', 'Mashhura', 50),
+          ]),
+        ],
+      }),
+    );
+
+    expect(rematch.gameMode).toBe('individual');
+    expect(rematch.targetRoundCount).toBe(8);
+    expect(rematch.teams[0].players.map((p) => p.name)).toEqual([
+      'Tolga',
+      'Aygül',
+    ]);
+    expect(rematch.teams[1].players.map((p) => p.name)).toEqual([
+      'Şahin',
+      'Mashhura',
+    ]);
+    expect(rematch.teams[0].totalScore).toBe(0);
   });
 
   it('defaults missing gameMode to paired on rematch', () => {

@@ -26,6 +26,7 @@ export function GameResultScreen({
   onNewTeams,
 }: GameResultScreenProps) {
   const result = useMemo(() => calculateGameResult(game), [game]);
+  const isIndividual = result.mode === 'individual';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -40,57 +41,94 @@ export function GameResultScreen({
             <Text style={styles.subtitle}>
               {result.playedRounds} / {result.targetRoundCount} el tamamlandı
             </Text>
+            <Text style={styles.semanticsHint}>Düşük puan avantajlıdır</Text>
           </View>
 
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>Kazanan Takım</Text>
-            {result.winner.kind === 'tie' ? (
-              <>
-                <Text style={styles.winnerTitle}>Berabere</Text>
-                <View style={styles.scoreRow}>
-                  <Text style={styles.scoreName} numberOfLines={1}>
-                    {result.winner.team1Name}
+          {isIndividual ? (
+            <View style={styles.card}>
+              <Text style={styles.cardLabel}>Kazanan Oyuncu</Text>
+              {result.individualWinner?.kind === 'tie' ? (
+                <>
+                  <Text style={styles.winnerTitle}>Berabere</Text>
+                  {result.individualWinner.players.map((row) => (
+                    <View key={row.playerId} style={styles.scoreRow}>
+                      <Text style={styles.scoreName} numberOfLines={1}>
+                        {row.name}
+                      </Text>
+                      <Text style={styles.scoreValue}>{row.totalScore}</Text>
+                    </View>
+                  ))}
+                </>
+              ) : result.individualWinner?.kind === 'winner' ? (
+                <>
+                  <Text style={styles.winnerTitle} numberOfLines={2}>
+                    {result.individualWinner.name}
                   </Text>
-                  <Text style={styles.scoreValue}>
-                    {result.winner.team1Score}
+                  <Text style={styles.winnerScore}>
+                    {result.individualWinner.totalScore}
                   </Text>
-                </View>
-                <View style={styles.scoreRow}>
-                  <Text style={styles.scoreName} numberOfLines={1}>
-                    {result.winner.team2Name}
+                </>
+              ) : null}
+            </View>
+          ) : (
+            <View style={styles.card}>
+              <Text style={styles.cardLabel}>Kazanan Takım</Text>
+              {result.pairedWinner?.kind === 'tie' ? (
+                <>
+                  <Text style={styles.winnerTitle}>Berabere</Text>
+                  <View style={styles.scoreRow}>
+                    <Text style={styles.scoreName} numberOfLines={1}>
+                      {result.pairedWinner.team1Name}
+                    </Text>
+                    <Text style={styles.scoreValue}>
+                      {result.pairedWinner.team1Score}
+                    </Text>
+                  </View>
+                  <View style={styles.scoreRow}>
+                    <Text style={styles.scoreName} numberOfLines={1}>
+                      {result.pairedWinner.team2Name}
+                    </Text>
+                    <Text style={styles.scoreValue}>
+                      {result.pairedWinner.team2Score}
+                    </Text>
+                  </View>
+                </>
+              ) : result.pairedWinner?.kind === 'winner' ? (
+                <>
+                  <Text style={styles.winnerTitle} numberOfLines={2}>
+                    {result.pairedWinner.teamName}
                   </Text>
-                  <Text style={styles.scoreValue}>
-                    {result.winner.team2Score}
+                  <Text style={styles.winnerScore}>
+                    {result.pairedWinner.teamScore}
                   </Text>
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={styles.winnerTitle} numberOfLines={2}>
-                  {result.winner.teamName}
-                </Text>
-                <Text style={styles.winnerScore}>
-                  {result.winner.teamScore}
-                </Text>
-                <View style={styles.scoreRow}>
-                  <Text style={styles.otherLabel} numberOfLines={1}>
-                    {result.winner.otherTeamName}
-                  </Text>
-                  <Text style={styles.otherScore}>
-                    {result.winner.otherTeamScore}
-                  </Text>
-                </View>
-              </>
-            )}
-          </View>
+                  <View style={styles.scoreRow}>
+                    <Text style={styles.otherLabel} numberOfLines={1}>
+                      {result.pairedWinner.otherTeamName}
+                    </Text>
+                    <Text style={styles.otherScore}>
+                      {result.pairedWinner.otherTeamScore}
+                    </Text>
+                  </View>
+                </>
+              ) : null}
+            </View>
+          )}
 
-          {result.topScorer ? (
+          {result.firstPlacePlayers.length > 0 ? (
             <View style={styles.topCard}>
-              <Text style={styles.cardLabel}>En Skorer Oyuncu</Text>
-              <Text style={styles.topName} numberOfLines={1}>
-                {result.topScorer.name}
+              <Text style={styles.cardLabel}>
+                {result.firstPlacePlayers.length > 1
+                  ? 'Oyun Birincileri'
+                  : 'Oyun Birincisi'}
               </Text>
-              <Text style={styles.topScore}>{result.topScorer.totalScore}</Text>
+              {result.firstPlacePlayers.map((row) => (
+                <View key={row.playerId}>
+                  <Text style={styles.topName} numberOfLines={1}>
+                    {row.name}
+                  </Text>
+                  <Text style={styles.topScore}>{row.totalScore}</Text>
+                </View>
+              ))}
             </View>
           ) : null}
 
@@ -160,6 +198,12 @@ const styles = StyleSheet.create({
     ...typography.infoLabel,
     color: colors.textSecondary,
   },
+  semanticsHint: {
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 16,
+    color: colors.primaryMuted,
+  },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
@@ -227,6 +271,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 34,
     color: colors.primaryMuted,
+    marginBottom: spacing.xs,
   },
   standings: {
     gap: 6,
