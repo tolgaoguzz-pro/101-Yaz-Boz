@@ -5,6 +5,7 @@ import {
   LastGameAction,
   SavedRoundSummary,
 } from '../ui/screens/ActiveGameScreen';
+import { resolveGameMode } from '../ui/gameMode';
 import { isGameComplete } from '../ui/gameResult';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -189,12 +190,16 @@ export function parseActiveGameSnapshot(
     targetRoundCount = parsed.targetRoundCount;
   }
 
+  // Eski kayıtlarda yoksa paired; geçersiz değer de paired’e düşer.
+  const gameMode = resolveGameMode(parsed.gameMode);
+
   return {
     teams: [team0, team1],
     roundNumber: parsed.roundNumber,
     rounds,
     lastAction,
     targetRoundCount,
+    gameMode,
   };
 }
 

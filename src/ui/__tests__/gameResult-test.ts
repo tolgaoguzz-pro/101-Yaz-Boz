@@ -232,4 +232,10 @@ describe('createRematchGame', () => {
       createRematchGame(makeGame({ targetRoundCount: undefined })).targetRoundCount,
     ).toBe(12);
   });
+
+  it('defaults missing gameMode to paired on rematch', () => {
+    expect(createRematchGame(makeGame({ gameMode: undefined })).gameMode).toBe(
+      'paired',
+    );
+  });
 });

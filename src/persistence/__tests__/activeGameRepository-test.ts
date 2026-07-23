@@ -14,6 +14,7 @@ function makeGame(
   overrides: Partial<ActiveGameData> = {},
 ): ActiveGameData {
   const base: ActiveGameData = {
+    gameMode: 'paired',
     roundNumber: 3,
     targetRoundCount: 12,
     lastAction: null,
@@ -196,5 +197,32 @@ describe('activeGameRepository (memory store)', () => {
 
     await expect(repo.loadActiveGame()).resolves.toBeNull();
     await expect(store.readRow()).resolves.toBeNull();
+  });
+
+  it('saves and loads an individual gameMode snapshot', async () => {
+    const repo = createRepo();
+    const game = makeGame({
+      gameMode: 'individual',
+      targetRoundCount: 8,
+    });
+    await repo.saveActiveGame(game);
+    const loaded = await repo.loadActiveGame();
+    expect(loaded?.gameMode).toBe('individual');
+    expect(loaded?.teams[0].players.map((p) => p.name)).toEqual([
+      'Tolga',
+      'Aygül',
+    ]);
+    expect(loaded?.teams[1].players.map((p) => p.name)).toEqual([
+      'Şahin',
+      'Mashhura',
+    ]);
+  });
+
+  it('falls back to paired when legacy snapshot omits gameMode', () => {
+    const legacy = makeGame({ gameMode: 'paired' });
+    const { gameMode: _ignored, ...withoutMode } = legacy;
+    const json = JSON.stringify(withoutMode);
+    expect(json.includes('gameMode')).toBe(false);
+    expect(parseActiveGameSnapshot(json)?.gameMode).toBe('paired');
   });
 });

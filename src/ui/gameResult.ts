@@ -3,6 +3,7 @@ import {
   ActiveGamePlayer,
   ActiveGameTeam,
 } from './screens/ActiveGameScreen';
+import { resolveGameMode } from './gameMode';
 import { resolveTargetRoundCount } from './targetRoundCount';
 
 export type GameResultPlayerStanding = {
@@ -156,5 +157,6 @@ export function createRematchGame(game: ActiveGameData): ActiveGameData {
     rounds: [],
     lastAction: null,
     targetRoundCount: resolveTargetRoundCount(game.targetRoundCount),
+    gameMode: resolveGameMode(game.gameMode),
   };
 }

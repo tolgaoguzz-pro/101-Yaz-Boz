@@ -11,6 +11,7 @@ import {
 import { HomeInfoCard } from '../components/HomeInfoCard';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SecondaryButton } from '../components/SecondaryButton';
+import { gameModeLabel, resolveGameMode } from '../gameMode';
 import { resolveTargetRoundCount } from '../targetRoundCount';
 import { colors, radii, spacing, typography } from '../theme';
 import { ActiveGameData } from './ActiveGameScreen';
@@ -55,6 +56,9 @@ export function HomeScreen({
     ? resolveTargetRoundCount(activeGame.targetRoundCount)
     : 0;
   const playedRounds = activeGame?.rounds.length ?? 0;
+  const modeLabel = activeGame
+    ? gameModeLabel(resolveGameMode(activeGame.gameMode))
+    : '';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -81,6 +85,7 @@ export function HomeScreen({
             ]}
           >
             <Text style={styles.activeLabel}>Devam Eden Oyun</Text>
+            <Text style={styles.activeMode}>{modeLabel}</Text>
             <Text style={styles.activeMeta}>
               Oynanan El: {playedRounds} / {targetRounds}
             </Text>
@@ -160,6 +165,13 @@ const styles = StyleSheet.create({
   activeLabel: {
     ...typography.infoLabel,
     color: colors.primary,
+    marginBottom: 2,
+  },
+  activeMode: {
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 16,
+    color: colors.primaryMuted,
     marginBottom: 2,
   },
   activeMeta: {

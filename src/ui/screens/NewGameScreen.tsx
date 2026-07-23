@@ -12,10 +12,19 @@ import {
 
 import { AppTextField } from '../components/AppTextField';
 import { PrimaryButton } from '../components/PrimaryButton';
-import { PLAYER_IDS } from '../gameRoster';
+import {
+  DEFAULT_GAME_MODE,
+  GameMode,
+  gameModeShortLabel,
+} from '../gameMode';
+import {
+  buildActiveGameFromSetup,
+  createInitialNewGameForm,
+  NewGameSetupForm,
+  validateNewGameSetup,
+} from '../newGameSetup';
 import {
   DEFAULT_TARGET_ROUND_COUNT,
-  isTargetRoundCountOption,
   TARGET_ROUND_COUNT_OPTIONS,
   TargetRoundCountOption,
 } from '../targetRoundCount';
@@ -27,31 +36,13 @@ type NewGameScreenProps = {
   onStart: (game: ActiveGameData) => void;
 };
 
-type GameSetupForm = {
-  team1Name: string;
-  player1Name: string;
-  player2Name: string;
-  team2Name: string;
-  player3Name: string;
-  player4Name: string;
-};
-
-const INITIAL_FORM: GameSetupForm = {
-  team1Name: 'Takım 1',
-  player1Name: 'Oyuncu 1',
-  player2Name: 'Oyuncu 2',
-  team2Name: 'Takım 2',
-  player3Name: 'Oyuncu 3',
-  player4Name: 'Oyuncu 4',
-};
-
-type RoundCountChipProps = {
+type ChoiceChipProps = {
   label: string;
   selected: boolean;
   onPress: () => void;
 };
 
-function RoundCountChip({ label, selected, onPress }: RoundCountChipProps) {
+function ChoiceChip({ label, selected, onPress }: ChoiceChipProps) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -69,21 +60,25 @@ function RoundCountChip({ label, selected, onPress }: RoundCountChipProps) {
   );
 }
 
-function isBlank(value: string): boolean {
-  return value.trim().length === 0;
-}
-
 export function NewGameScreen({ onBack, onStart }: NewGameScreenProps) {
-  const [form, setForm] = useState<GameSetupForm>(INITIAL_FORM);
+  const [form, setForm] = useState<NewGameSetupForm>(createInitialNewGameForm);
+  const [gameMode, setGameMode] = useState<GameMode>(DEFAULT_GAME_MODE);
   const [targetRoundCount, setTargetRoundCount] =
     useState<TargetRoundCountOption>(DEFAULT_TARGET_ROUND_COUNT);
   const [error, setError] = useState<string | null>(null);
 
-  function updateField<K extends keyof GameSetupForm>(
+  function updateField<K extends keyof NewGameSetupForm>(
     key: K,
-    value: GameSetupForm[K],
+    value: NewGameSetupForm[K],
   ) {
     setForm((current) => ({ ...current, [key]: value }));
+    if (error) {
+      setError(null);
+    }
+  }
+
+  function handleSelectGameMode(mode: GameMode) {
+    setGameMode(mode);
     if (error) {
       setError(null);
     }
@@ -97,60 +92,21 @@ export function NewGameScreen({ onBack, onStart }: NewGameScreenProps) {
   }
 
   function handleStart() {
-    const values = Object.values(form);
-    if (values.some(isBlank)) {
-      setError('Tüm takım ve oyuncu adlarını doldurmalısın.');
-      return;
-    }
-
-    if (!isTargetRoundCountOption(targetRoundCount)) {
-      setError('Kaç el oynanacağını seçmelisin (8, 10, 12 veya 16).');
-      return;
-    }
-
-    const game: ActiveGameData = {
-      roundNumber: 1,
-      rounds: [],
-      lastAction: null,
+    const input = {
+      ...form,
+      gameMode,
       targetRoundCount,
-      teams: [
-        {
-          name: form.team1Name.trim(),
-          totalScore: 0,
-          players: [
-            {
-              id: PLAYER_IDS.player1,
-              name: form.player1Name.trim(),
-              totalScore: 0,
-            },
-            {
-              id: PLAYER_IDS.player2,
-              name: form.player2Name.trim(),
-              totalScore: 0,
-            },
-          ],
-        },
-        {
-          name: form.team2Name.trim(),
-          totalScore: 0,
-          players: [
-            {
-              id: PLAYER_IDS.player3,
-              name: form.player3Name.trim(),
-              totalScore: 0,
-            },
-            {
-              id: PLAYER_IDS.player4,
-              name: form.player4Name.trim(),
-              totalScore: 0,
-            },
-          ],
-        },
-      ],
     };
+    const validationError = validateNewGameSetup(input);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
 
-    onStart(game);
+    onStart(buildActiveGameFromSetup(input));
   }
+
+  const isPaired = gameMode === 'paired';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -178,47 +134,93 @@ export function NewGameScreen({ onBack, onStart }: NewGameScreenProps) {
           <View style={styles.header}>
             <Text style={styles.title}>Yeni Oyun</Text>
             <Text style={styles.subtitle}>
-              Takımları ve oyuncuları belirle, masayı kur.
+              {isPaired
+                ? 'Takımları ve oyuncuları belirle, masayı kur.'
+                : 'Dört oyuncuyu belirle, masayı kur.'}
             </Text>
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Takım 1</Text>
-            <AppTextField
-              label="Takım adı"
-              value={form.team1Name}
-              onChangeText={(value) => updateField('team1Name', value)}
-            />
-            <AppTextField
-              label="Oyuncu 1"
-              value={form.player1Name}
-              onChangeText={(value) => updateField('player1Name', value)}
-            />
-            <AppTextField
-              label="Oyuncu 2"
-              value={form.player2Name}
-              onChangeText={(value) => updateField('player2Name', value)}
-            />
+            <Text style={styles.cardTitle}>Oyun Modu</Text>
+            <View style={styles.chipRow}>
+              <ChoiceChip
+                label={gameModeShortLabel('paired')}
+                selected={gameMode === 'paired'}
+                onPress={() => handleSelectGameMode('paired')}
+              />
+              <ChoiceChip
+                label={gameModeShortLabel('individual')}
+                selected={gameMode === 'individual'}
+                onPress={() => handleSelectGameMode('individual')}
+              />
+            </View>
           </View>
 
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Takım 2</Text>
-            <AppTextField
-              label="Takım adı"
-              value={form.team2Name}
-              onChangeText={(value) => updateField('team2Name', value)}
-            />
-            <AppTextField
-              label="Oyuncu 3"
-              value={form.player3Name}
-              onChangeText={(value) => updateField('player3Name', value)}
-            />
-            <AppTextField
-              label="Oyuncu 4"
-              value={form.player4Name}
-              onChangeText={(value) => updateField('player4Name', value)}
-            />
-          </View>
+          {isPaired ? (
+            <>
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Takım 1</Text>
+                <AppTextField
+                  label="Takım adı"
+                  value={form.team1Name}
+                  onChangeText={(value) => updateField('team1Name', value)}
+                />
+                <AppTextField
+                  label="Oyuncu 1"
+                  value={form.player1Name}
+                  onChangeText={(value) => updateField('player1Name', value)}
+                />
+                <AppTextField
+                  label="Oyuncu 2"
+                  value={form.player2Name}
+                  onChangeText={(value) => updateField('player2Name', value)}
+                />
+              </View>
+
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Takım 2</Text>
+                <AppTextField
+                  label="Takım adı"
+                  value={form.team2Name}
+                  onChangeText={(value) => updateField('team2Name', value)}
+                />
+                <AppTextField
+                  label="Oyuncu 3"
+                  value={form.player3Name}
+                  onChangeText={(value) => updateField('player3Name', value)}
+                />
+                <AppTextField
+                  label="Oyuncu 4"
+                  value={form.player4Name}
+                  onChangeText={(value) => updateField('player4Name', value)}
+                />
+              </View>
+            </>
+          ) : (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Oyuncular</Text>
+              <AppTextField
+                label="Oyuncu 1"
+                value={form.player1Name}
+                onChangeText={(value) => updateField('player1Name', value)}
+              />
+              <AppTextField
+                label="Oyuncu 2"
+                value={form.player2Name}
+                onChangeText={(value) => updateField('player2Name', value)}
+              />
+              <AppTextField
+                label="Oyuncu 3"
+                value={form.player3Name}
+                onChangeText={(value) => updateField('player3Name', value)}
+              />
+              <AppTextField
+                label="Oyuncu 4"
+                value={form.player4Name}
+                onChangeText={(value) => updateField('player4Name', value)}
+              />
+            </View>
+          )}
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Kaç el oynanacak?</Text>
@@ -227,7 +229,7 @@ export function NewGameScreen({ onBack, onStart }: NewGameScreenProps) {
             </Text>
             <View style={styles.chipRow}>
               {TARGET_ROUND_COUNT_OPTIONS.map((option) => (
-                <RoundCountChip
+                <ChoiceChip
                   key={option}
                   label={`${option} El`}
                   selected={targetRoundCount === option}

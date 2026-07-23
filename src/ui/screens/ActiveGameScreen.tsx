@@ -11,6 +11,7 @@ import {
 import { TEAM_IDS } from '../gameRoster';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SecondaryButton } from '../components/SecondaryButton';
+import type { GameMode } from '../gameMode';
 import {
   remainingRoundCount,
   resolveTargetRoundCount,
@@ -53,6 +54,11 @@ export type ActiveGameData = {
    * Yeni oyunlarda zorunlu kaydedilir; eski state için opsiyonel fallback kullanılır.
    */
   targetRoundCount?: number;
+  /**
+   * paired = eşli, individual = tekli.
+   * Yeni oyunlarda zorunlu; eski snapshot’ta yoksa paired.
+   */
+  gameMode?: GameMode;
 };
 
 type ActiveGameScreenProps = {
