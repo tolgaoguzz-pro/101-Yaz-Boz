@@ -1,15 +1,10 @@
+import { Player, RoundInput } from './models';
+import { ScoreRules } from './rules';
 import {
-  FinishType,
-  Player,
-  PlayerRoundInput,
-  RoundInput,
-} from './models';
-import {
-  ExtraPenaltyTiming,
-  HandExtrasRules,
-  OpenBaseRules,
-  ScoreRules,
-} from './rules';
+  finishTeamBonusAmount,
+  opponentFinishMultiplier,
+} from './scoring/finishMultiplier';
+import { scoreForPlayer } from './scoring/scoreForPlayer';
 import { validateRoundInput } from './validateRoundInput';
 
 export type PlayerRoundScore = {
@@ -33,68 +28,6 @@ export type CalculateRoundResult = {
   finishTeamBonus: FinishTeamBonusResult;
 };
 
-function basePenalty(
-  player: PlayerRoundInput,
-  openBase: OpenBaseRules,
-): number {
-  switch (player.openType) {
-    case 'didNotOpen':
-      return openBase.didNotOpenPenalty;
-    case 'series':
-      return player.remainingTilePoints * openBase.seriesTileSumMultiplier;
-    case 'doubles':
-      return player.remainingTilePoints * openBase.doublesTileSumMultiplier;
-  }
-}
-
-function handExtrasPenalty(
-  player: PlayerRoundInput,
-  handExtras: HandExtrasRules,
-): number {
-  return (
-    player.remainingOkeyCount * handExtras.okeyPenalty +
-    player.wrongOpenCount * handExtras.wrongOpenPenalty +
-    player.playableTileDiscardCount * handExtras.playableTileDiscardPenalty +
-    player.manualPenalty
-  );
-}
-
-function opponentFinishMultiplier(
-  finishType: FinishType,
-  rules: ScoreRules,
-): number {
-  switch (finishType) {
-    case 'normal':
-      return rules.opponentFinishMultiplier.normal;
-    case 'okey':
-      return rules.opponentFinishMultiplier.okey;
-    case 'fromHand':
-      return rules.opponentFinishMultiplier.fromHand;
-    case 'fromHandAndOkey':
-      return rules.opponentFinishMultiplier.fromHandAndOkey;
-    case 'none':
-      return rules.opponentFinishMultiplier.none;
-  }
-}
-
-function finishTeamBonusAmount(
-  finishType: FinishType,
-  rules: ScoreRules,
-): number {
-  switch (finishType) {
-    case 'normal':
-      return rules.finishTeamBonus.normal;
-    case 'okey':
-      return rules.finishTeamBonus.okey;
-    case 'fromHand':
-      return rules.finishTeamBonus.fromHand;
-    case 'fromHandAndOkey':
-      return rules.finishTeamBonus.fromHandAndOkey;
-    case 'none':
-      return 0;
-  }
-}
-
 function requireTeamId(roster: Player[], playerId: string): string {
   const player = roster.find((entry) => entry.id === playerId);
   if (!player) {
@@ -104,59 +37,6 @@ function requireTeamId(roster: Player[], playerId: string): string {
     throw new Error(`Player "${playerId}" is missing a teamId.`);
   }
   return player.teamId;
-}
-
-function applyExtrasWithFinishMultiplier(
-  base: number,
-  extras: number,
-  finishMultiplier: number,
-  timing: ExtraPenaltyTiming,
-): number {
-  switch (timing) {
-    case 'beforeFinishMultiplier':
-      return (base + extras) * finishMultiplier;
-    case 'afterFinishMultiplier':
-      return base * finishMultiplier + extras;
-  }
-}
-
-function scoreForPlayer(
-  player: PlayerRoundInput,
-  rules: ScoreRules,
-  finishType: FinishType,
-  finisherPlayerId: string | null,
-  finisherTeamId: string | null,
-  finishMultiplier: number,
-  roster: Player[],
-): number {
-  const base = basePenalty(player, rules.openBase);
-  const extras = handExtrasPenalty(player, rules.handExtras);
-
-  if (finishType === 'none') {
-    return base + extras;
-  }
-
-  if (player.playerId === finisherPlayerId) {
-    return 0;
-  }
-
-  const playerTeamId = requireTeamId(roster, player.playerId);
-
-  if (finisherTeamId !== null && playerTeamId === finisherTeamId) {
-    switch (rules.finisherPartner.penaltyMode) {
-      case 'fixed':
-        return rules.finisherPartner.fixedPenalty;
-      case 'calculated':
-        return base + extras;
-    }
-  }
-
-  return applyExtrasWithFinishMultiplier(
-    base,
-    extras,
-    finishMultiplier,
-    rules.extraPenaltyTiming,
-  );
 }
 
 /**
