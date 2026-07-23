@@ -1,19 +1,9 @@
 import { FinishType, Player, PlayerRoundInput } from '../models';
 import { ScoreRules } from '../rules';
+import { requireTeamId } from '../teams/requireTeamId';
 import { applyExtrasWithFinishMultiplier } from './applyExtrasWithFinishMultiplier';
 import { basePenalty } from './basePenalty';
 import { handExtrasPenalty } from './handExtrasPenalty';
-
-function requireTeamId(roster: Player[], playerId: string): string {
-  const player = roster.find((entry) => entry.id === playerId);
-  if (!player) {
-    throw new Error(`Player "${playerId}" is not in the roster.`);
-  }
-  if (!player.teamId) {
-    throw new Error(`Player "${playerId}" is missing a teamId.`);
-  }
-  return player.teamId;
-}
 
 export function scoreForPlayer(
   player: PlayerRoundInput,
