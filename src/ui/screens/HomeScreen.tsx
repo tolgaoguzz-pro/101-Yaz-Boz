@@ -15,18 +15,17 @@ import { resolveGameStatus } from '../gameLifecycle';
 import { resolveTargetRoundCount } from '../targetRoundCount';
 import { ActiveGameData } from './ActiveGameScreen';
 
-/** Referans ANA EKRAN paleti. */
 const home = {
   felt: '#1F5E3B',
   feltDeep: '#174A2E',
   feltLight: '#2A6E47',
   cream: '#F7F2E8',
   gold: '#C8A44D',
-  goldSoft: '#D4B56A',
   text: '#263238',
   textMuted: '#6B736C',
-  divider: '#E2DCD0',
   white: '#FFFFFF',
+  card: '#FFFEF9',
+  cardBorder: 'rgba(200, 164, 77, 0.35)',
   tileFace: '#FFFEF8',
   tileRed: '#C62828',
   tileBlack: '#1A1A1A',
@@ -43,90 +42,113 @@ type HomeScreenProps = {
   onAbout: () => void;
 };
 
-type MenuRowProps = {
+type MenuCardProps = {
   icon: ReactNode;
   title: string;
   subtitle: string;
   onPress: () => void;
-  showDivider?: boolean;
   disabled?: boolean;
+  compact?: boolean;
 };
 
-function MenuRow({
+function MenuCard({
   icon,
   title,
   subtitle,
   onPress,
-  showDivider = true,
   disabled = false,
-}: MenuRowProps) {
+  compact = false,
+}: MenuCardProps) {
   return (
-    <View>
-      <Pressable
-        accessibilityRole="button"
-        disabled={disabled}
-        onPress={onPress}
-        style={({ pressed }) => [
-          styles.menuRow,
-          disabled && styles.menuRowDisabled,
-          pressed && !disabled && styles.menuRowPressed,
-        ]}
-      >
-        <View style={[styles.menuIconSlot, disabled && styles.menuIconMuted]}>
-          {icon}
-        </View>
-        <View style={styles.menuText}>
-          <Text style={[styles.menuTitle, disabled && styles.menuTitleDisabled]}>
-            {title}
-          </Text>
-          <Text
-            style={[
-              styles.menuSubtitle,
-              disabled && styles.menuSubtitleDisabled,
-            ]}
-            numberOfLines={1}
-          >
-            {subtitle}
-          </Text>
-        </View>
-      </Pressable>
-      {showDivider ? <View style={styles.divider} /> : null}
-    </View>
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.menuCard,
+        compact && styles.menuCardCompact,
+        disabled && styles.menuCardDisabled,
+        pressed && !disabled && styles.menuCardPressed,
+      ]}
+    >
+      <View style={styles.menuIconSlot}>{icon}</View>
+      <View style={styles.menuText}>
+        <Text
+          style={[styles.menuTitle, disabled && styles.menuTitleDisabled]}
+          numberOfLines={1}
+        >
+          {title}
+        </Text>
+        <Text
+          style={[styles.menuSubtitle, disabled && styles.menuSubtitleDisabled]}
+          numberOfLines={1}
+        >
+          {subtitle}
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 
-/** Referanstaki 101 taş motifi — yalnız RN View/Text. */
-function LogoTiles() {
+function LogoTiles({ compact }: { compact?: boolean }) {
   return (
     <View style={styles.tileRow}>
-      <View style={styles.tile}>
-        <Text style={[styles.tileDigit, styles.tileDigitRed]}>1</Text>
+      <View style={[styles.tile, compact && styles.tileCompact]}>
+        <Text
+          style={[
+            styles.tileDigit,
+            compact && styles.tileDigitCompact,
+            styles.tileDigitRed,
+          ]}
+        >
+          1
+        </Text>
       </View>
-      <View style={styles.tile}>
-        <Text style={[styles.tileDigit, styles.tileDigitBlack]}>0</Text>
+      <View style={[styles.tile, compact && styles.tileCompact]}>
+        <Text
+          style={[
+            styles.tileDigit,
+            compact && styles.tileDigitCompact,
+            styles.tileDigitBlack,
+          ]}
+        >
+          0
+        </Text>
       </View>
-      <View style={styles.tile}>
-        <Text style={[styles.tileDigit, styles.tileDigitRed]}>1</Text>
+      <View style={[styles.tile, compact && styles.tileCompact]}>
+        <Text
+          style={[
+            styles.tileDigit,
+            compact && styles.tileDigitCompact,
+            styles.tileDigitRed,
+          ]}
+        >
+          1
+        </Text>
       </View>
     </View>
   );
 }
 
-function PlayIcon() {
+function PlayIcon({ strong = false }: { strong?: boolean }) {
   return (
-    <View style={styles.playBadge}>
-      <Text style={styles.iconPlay}>▶</Text>
+    <View style={[styles.iconCircle, strong && styles.iconCircleStrong]}>
+      <Text style={[styles.iconPlay, strong && styles.iconPlayStrong]}>▶</Text>
     </View>
   );
 }
 
 function TrophyIcon() {
-  return <Text style={styles.iconGold}>♔</Text>;
+  return (
+    <View style={styles.iconCircle}>
+      <Text style={styles.iconGlyph}>♔</Text>
+    </View>
+  );
 }
 
 function PlusIcon() {
   return (
-    <View style={styles.plusBadge}>
+    <View style={styles.iconCircle}>
       <Text style={styles.iconPlus}>＋</Text>
     </View>
   );
@@ -134,18 +156,20 @@ function PlusIcon() {
 
 function StatsIcon() {
   return (
-    <View style={styles.statsBars}>
-      <View style={[styles.statsBar, styles.statsBarShort]} />
-      <View style={[styles.statsBar, styles.statsBarMid]} />
-      <View style={[styles.statsBar, styles.statsBarTall]} />
+    <View style={styles.iconCircle}>
+      <View style={styles.statsBars}>
+        <View style={[styles.statsBar, styles.statsBarShort]} />
+        <View style={[styles.statsBar, styles.statsBarMid]} />
+        <View style={[styles.statsBar, styles.statsBarTall]} />
+      </View>
     </View>
   );
 }
 
 function InfoIcon() {
   return (
-    <View style={styles.infoBadge}>
-      <Text style={styles.infoBadgeText}>i</Text>
+    <View style={styles.iconCircle}>
+      <Text style={styles.iconInfo}>i</Text>
     </View>
   );
 }
@@ -228,13 +252,30 @@ export function HomeScreen({
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={[styles.felt, compact && styles.feltCompact]}>
+      <View style={[styles.hero, compact && styles.heroCompact]}>
         <View style={styles.feltTextureA} />
         <View style={styles.feltTextureB} />
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Hakkında"
+          onPress={onAbout}
+          hitSlop={10}
+          style={({ pressed }) => [
+            styles.settingsButton,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={styles.settingsGlyph}>⚙</Text>
+        </Pressable>
+
         <View style={styles.logoBlock}>
-          <LogoTiles />
-          <Text style={[styles.logoWordmark, compact && styles.logoWordmarkCompact]}>
-            101 YAZ-BOZ
+          <LogoTiles compact={compact} />
+          <Text style={[styles.logo101, compact && styles.logo101Compact]}>
+            101
+          </Text>
+          <Text style={[styles.logoYazBoz, compact && styles.logoYazBozCompact]}>
+            YAZ-BOZ
           </Text>
         </View>
       </View>
@@ -242,85 +283,81 @@ export function HomeScreen({
       <View style={[styles.sheet, compact && styles.sheetCompact]}>
         <View style={styles.menuList}>
           {activeGame ? (
-            <View>
-              <Pressable
-                accessibilityRole="button"
-                onPress={onContinue}
-                style={({ pressed }) => [
-                  styles.menuRow,
-                  styles.continueRow,
-                  pressed && styles.menuRowPressed,
-                ]}
-              >
-                <View style={styles.menuIconSlot}>
-                  <PlayIcon />
-                </View>
-                <View style={styles.menuText}>
-                  <Text style={styles.menuTitle}>{continueTitle}</Text>
-                  <Text style={styles.menuSubtitle} numberOfLines={1}>
-                    {modeLabel} · El {playedRounds}/{targetRounds}
+            <Pressable
+              accessibilityRole="button"
+              onPress={onContinue}
+              style={({ pressed }) => [
+                styles.menuCard,
+                styles.continueCard,
+                compact && styles.menuCardCompact,
+                pressed && styles.menuCardPressed,
+              ]}
+            >
+              <View style={styles.menuIconSlot}>
+                <PlayIcon strong />
+              </View>
+              <View style={styles.menuText}>
+                <Text style={styles.menuTitle}>{continueTitle}</Text>
+                <Text style={styles.menuSubtitle} numberOfLines={1}>
+                  {modeLabel} · El {playedRounds}/{targetRounds}
+                </Text>
+                {status === 'paused' ? (
+                  <Text style={styles.pausedBadge}>Duraklatıldı</Text>
+                ) : null}
+                {scoreLines.map((line) => (
+                  <Text key={line} style={styles.scoreLine} numberOfLines={1}>
+                    {line}
                   </Text>
-                  {status === 'paused' ? (
-                    <Text style={styles.pausedBadge}>Duraklatıldı</Text>
-                  ) : null}
-                  {scoreLines.map((line) => (
-                    <Text key={line} style={styles.scoreLine} numberOfLines={1}>
-                      {line}
-                    </Text>
-                  ))}
-                  {activeGame.updatedAt ? (
-                    <Text style={styles.updatedLine} numberOfLines={1}>
-                      Son güncelleme:{' '}
-                      {new Date(activeGame.updatedAt).toLocaleString('tr-TR')}
-                    </Text>
-                  ) : null}
-                  <View style={styles.continueActions}>
-                    <Pressable onPress={handleRestart} hitSlop={8}>
-                      <Text style={styles.continueLink}>Yeniden Başlat</Text>
-                    </Pressable>
-                    <Text style={styles.continueDot}>·</Text>
-                    <Pressable onPress={handleAbandon} hitSlop={8}>
-                      <Text style={styles.continueLinkMuted}>İptal Et</Text>
-                    </Pressable>
-                  </View>
+                ))}
+                <View style={styles.continueActions}>
+                  <Pressable onPress={handleRestart} hitSlop={8}>
+                    <Text style={styles.continueLink}>Yeniden Başlat</Text>
+                  </Pressable>
+                  <Text style={styles.continueDot}>·</Text>
+                  <Pressable onPress={handleAbandon} hitSlop={8}>
+                    <Text style={styles.continueLinkMuted}>İptal Et</Text>
+                  </Pressable>
                 </View>
-              </Pressable>
-              <View style={styles.divider} />
-            </View>
+              </View>
+            </Pressable>
           ) : (
-            <MenuRow
+            <MenuCard
               icon={<PlayIcon />}
               title="Devam Eden Oyun"
               subtitle="Son oyuna devam et"
               onPress={onContinue}
               disabled
+              compact={compact}
             />
           )}
 
-          <MenuRow
+          <MenuCard
             icon={<TrophyIcon />}
             title="Turnuvalar ve Geçmiş"
             subtitle="Turnuva geçmişini görüntüle"
             onPress={onTournaments}
+            compact={compact}
           />
-          <MenuRow
+          <MenuCard
             icon={<PlusIcon />}
             title="Yeni Oyun"
             subtitle="Yeni bir oyun başlat"
             onPress={handleNewGame}
+            compact={compact}
           />
-          <MenuRow
+          <MenuCard
             icon={<StatsIcon />}
             title="İstatistikler"
             subtitle="Oyun ve başarı istatistikleri"
             onPress={onStats}
+            compact={compact}
           />
-          <MenuRow
+          <MenuCard
             icon={<InfoIcon />}
             title="Hakkında"
             subtitle="Uygulama hakkında"
             onPress={onAbout}
-            showDivider={false}
+            compact={compact}
           />
         </View>
 
@@ -338,68 +375,88 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: home.felt,
   },
-  felt: {
-    height: '22%',
-    minHeight: 128,
-    maxHeight: 176,
+  hero: {
+    height: '30%',
+    minHeight: 168,
+    maxHeight: 230,
     backgroundColor: home.felt,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    paddingBottom: 6,
+    paddingTop: 8,
+    paddingBottom: 12,
   },
-  feltCompact: {
-    height: '18%',
-    minHeight: 112,
-    maxHeight: 140,
+  heroCompact: {
+    height: '24%',
+    minHeight: 140,
+    maxHeight: 168,
+    paddingBottom: 8,
   },
   feltTextureA: {
     position: 'absolute',
-    top: -36,
-    left: -28,
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    backgroundColor: home.feltLight,
-    opacity: 0.2,
-  },
-  feltTextureB: {
-    position: 'absolute',
-    bottom: -44,
-    right: -24,
+    top: -40,
+    left: -30,
     width: 170,
     height: 170,
     borderRadius: 85,
+    backgroundColor: home.feltLight,
+    opacity: 0.22,
+  },
+  feltTextureB: {
+    position: 'absolute',
+    bottom: -50,
+    right: -28,
+    width: 190,
+    height: 190,
+    borderRadius: 95,
     backgroundColor: home.feltDeep,
-    opacity: 0.38,
+    opacity: 0.4,
+  },
+  settingsButton: {
+    position: 'absolute',
+    top: 6,
+    right: 14,
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  settingsGlyph: {
+    fontSize: 18,
+    color: 'rgba(255,255,255,0.85)',
   },
   logoBlock: {
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
   },
   tileRow: {
     flexDirection: 'row',
-    gap: 7,
+    gap: 8,
+    marginBottom: 4,
   },
   tile: {
-    width: 36,
-    height: 48,
-    borderRadius: 5,
+    width: 40,
+    height: 52,
+    borderRadius: 6,
     backgroundColor: home.tileFace,
     borderWidth: 1.5,
     borderColor: home.gold,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
+  },
+  tileCompact: {
+    width: 32,
+    height: 42,
   },
   tileDigit: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '800',
-    lineHeight: 26,
+    lineHeight: 28,
+  },
+  tileDigitCompact: {
+    fontSize: 20,
+    lineHeight: 24,
   },
   tileDigitRed: {
     color: home.tileRed,
@@ -407,62 +464,78 @@ const styles = StyleSheet.create({
   tileDigitBlack: {
     color: home.tileBlack,
   },
-  logoWordmark: {
-    fontSize: 22,
+  logo101: {
+    fontSize: 64,
     fontWeight: '800',
-    letterSpacing: 2.5,
+    lineHeight: 68,
     color: home.gold,
+    letterSpacing: 1,
   },
-  logoWordmarkCompact: {
-    fontSize: 19,
-    letterSpacing: 2,
+  logo101Compact: {
+    fontSize: 48,
+    lineHeight: 52,
+  },
+  logoYazBoz: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 6,
+    color: home.white,
+  },
+  logoYazBozCompact: {
+    fontSize: 14,
+    letterSpacing: 4,
   },
   sheet: {
     flex: 1,
     backgroundColor: home.cream,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingTop: 14,
-    paddingHorizontal: 22,
-    paddingBottom: 10,
+    marginTop: -8,
+    paddingTop: 16,
+    paddingHorizontal: 18,
+    paddingBottom: 8,
     justifyContent: 'space-between',
   },
   sheetCompact: {
-    paddingTop: 10,
-    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingHorizontal: 14,
   },
   menuList: {
-    flexGrow: 1,
-    justifyContent: 'flex-start',
-    paddingTop: 4,
+    gap: 8,
   },
-  menuRow: {
+  menuCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 58,
-    paddingVertical: 0,
-    gap: 14,
-  },
-  continueRow: {
-    alignItems: 'flex-start',
-    height: undefined,
-    minHeight: 58,
+    minHeight: 64,
     paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 12,
+    backgroundColor: home.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: home.cardBorder,
   },
-  menuRowPressed: {
-    opacity: 0.72,
+  menuCardCompact: {
+    minHeight: 54,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 12,
   },
-  menuRowDisabled: {
-    opacity: 0.72,
+  continueCard: {
+    alignItems: 'flex-start',
+    minHeight: 64,
+  },
+  menuCardPressed: {
+    opacity: 0.78,
+  },
+  menuCardDisabled: {
+    opacity: 0.78,
+    backgroundColor: 'rgba(255,254,249,0.7)',
   },
   menuIconSlot: {
-    width: 32,
-    height: 32,
+    width: 40,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  menuIconMuted: {
-    opacity: 0.75,
   },
   menuText: {
     flex: 1,
@@ -471,7 +544,7 @@ const styles = StyleSheet.create({
   menuTitle: {
     fontSize: 16,
     fontWeight: '700',
-    lineHeight: 21,
+    lineHeight: 20,
     color: home.text,
   },
   menuTitleDisabled: {
@@ -493,23 +566,16 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   scoreLine: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
-    lineHeight: 18,
+    lineHeight: 16,
     color: home.text,
-  },
-  updatedLine: {
-    fontSize: 11,
-    fontWeight: '500',
-    lineHeight: 15,
-    color: home.textMuted,
-    marginTop: 2,
   },
   continueActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 6,
+    marginTop: 4,
   },
   continueLink: {
     fontSize: 12,
@@ -524,84 +590,69 @@ const styles = StyleSheet.create({
   continueDot: {
     color: home.textMuted,
   },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: home.divider,
-  },
-  playBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+  iconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     borderWidth: 1.5,
     borderColor: home.gold,
+    backgroundColor: home.white,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: home.white,
+  },
+  iconCircleStrong: {
+    backgroundColor: home.felt,
+    borderColor: home.gold,
   },
   iconPlay: {
-    fontSize: 11,
+    fontSize: 12,
     color: home.felt,
     marginLeft: 1,
   },
-  iconGold: {
-    fontSize: 20,
-    color: home.gold,
+  iconPlayStrong: {
+    color: home.white,
   },
-  plusBadge: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 1.5,
-    borderColor: home.gold,
-    alignItems: 'center',
-    justifyContent: 'center',
+  iconGlyph: {
+    fontSize: 16,
+    color: home.felt,
   },
   iconPlus: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
-    color: home.gold,
+    color: home.felt,
+    marginTop: -1,
+  },
+  iconInfo: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: home.felt,
     marginTop: -1,
   },
   statsBars: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 3,
-    height: 20,
-  },
-  statsBar: {
-    width: 4,
-    borderRadius: 1,
-    backgroundColor: home.gold,
-  },
-  statsBarShort: {
-    height: 9,
-  },
-  statsBarMid: {
+    gap: 2,
     height: 14,
   },
+  statsBar: {
+    width: 3,
+    borderRadius: 1,
+    backgroundColor: home.felt,
+  },
+  statsBarShort: {
+    height: 6,
+  },
+  statsBarMid: {
+    height: 10,
+  },
   statsBarTall: {
-    height: 20,
-  },
-  infoBadge: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    borderColor: home.gold,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  infoBadgeText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: home.gold,
-    marginTop: -1,
+    height: 14,
   },
   footer: {
     alignItems: 'center',
-    gap: 3,
-    paddingTop: 6,
-    paddingBottom: 2,
+    gap: 2,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
   club: {
     fontSize: 14,
@@ -610,6 +661,9 @@ const styles = StyleSheet.create({
   credit: {
     fontSize: 10,
     fontWeight: '500',
-    color: home.textMuted,
+    color: home.gold,
+  },
+  pressed: {
+    opacity: 0.75,
   },
 });

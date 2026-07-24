@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useRef, useState, type RefObject } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
@@ -29,16 +31,16 @@ import {
 } from '../targetRoundCount';
 import { ActiveGameData } from './ActiveGameScreen';
 
-/** Home / ActiveGame ile aynı referans paleti. */
 const ui = {
   green: '#1F5E3B',
   cream: '#F7F2E8',
+  creamCard: '#FFFEF9',
   gold: '#C8A44D',
+  goldSoft: 'rgba(200, 164, 77, 0.55)',
   white: '#FFFFFF',
   text: '#263238',
-  textMuted: '#7A847C',
-  line: 'rgba(200, 164, 77, 0.45)',
-  border: '#C5BBA8',
+  textMuted: '#6B736C',
+  border: '#D4CBB8',
 } as const;
 
 type NewGameScreenProps = {
@@ -46,70 +48,39 @@ type NewGameScreenProps = {
   onStart: (game: ActiveGameData) => void;
 };
 
-type SegmentProps = {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-};
-
-function Segment({ label, selected, onPress }: SegmentProps) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.segment,
-        selected && styles.segmentSelected,
-        pressed && styles.pressed,
-      ]}
-    >
-      <Text
-        style={[styles.segmentLabel, selected && styles.segmentLabelSelected]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-type ChipProps = {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-};
-
-function Chip({ label, selected, onPress }: ChipProps) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        selected && styles.chipSelected,
-        pressed && styles.pressed,
-      ]}
-    >
-      <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-type CompactFieldProps = {
+type CompactInputProps = {
   label: string;
   value: string;
   onChangeText: (value: string) => void;
+  inputRef?: RefObject<TextInput | null>;
+  returnKeyType?: 'next' | 'done';
+  onSubmitEditing?: () => void;
+  onFocus?: () => void;
 };
 
-function CompactField({ label, value, onChangeText }: CompactFieldProps) {
+function CompactInput({
+  label,
+  value,
+  onChangeText,
+  inputRef,
+  returnKeyType = 'next',
+  onSubmitEditing,
+  onFocus,
+}: CompactInputProps) {
   return (
-    <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+    <View style={styles.fieldRow}>
+      <Text style={styles.fieldLabel} numberOfLines={1}>
+        {label}
+      </Text>
       <TextInput
+        ref={inputRef}
         value={value}
         onChangeText={onChangeText}
         selectTextOnFocus
+        returnKeyType={returnKeyType}
+        blurOnSubmit={returnKeyType === 'done'}
+        onSubmitEditing={onSubmitEditing}
+        onFocus={onFocus}
         placeholderTextColor={ui.textMuted}
         style={styles.fieldInput}
       />
@@ -118,6 +89,17 @@ function CompactField({ label, value, onChangeText }: CompactFieldProps) {
 }
 
 export function NewGameScreen({ onBack, onStart }: NewGameScreenProps) {
+  const { height } = useWindowDimensions();
+  const compact = height < 700;
+  const scrollRef = useRef<ScrollView>(null);
+
+  const team1Ref = useRef<TextInput>(null);
+  const p1Ref = useRef<TextInput>(null);
+  const p2Ref = useRef<TextInput>(null);
+  const team2Ref = useRef<TextInput>(null);
+  const p3Ref = useRef<TextInput>(null);
+  const p4Ref = useRef<TextInput>(null);
+
   const [form, setForm] = useState<NewGameSetupForm>(createInitialNewGameForm);
   const [gameMode, setGameMode] = useState<GameMode>(DEFAULT_GAME_MODE);
   const [targetRoundCount, setTargetRoundCount] =
@@ -141,11 +123,38 @@ export function NewGameScreen({ onBack, onStart }: NewGameScreenProps) {
     }
   }
 
-  function handleSelectRoundCount(value: TargetRoundCountOption) {
-    setTargetRoundCount(value);
+  function setRoundByIndex(index: number) {
+    const clamped = Math.max(
+      0,
+      Math.min(TARGET_ROUND_COUNT_OPTIONS.length - 1, index),
+    );
+    setTargetRoundCount(TARGET_ROUND_COUNT_OPTIONS[clamped]);
     if (error) {
       setError(null);
     }
+  }
+
+  function stepRound(delta: number) {
+    const currentIndex = TARGET_ROUND_COUNT_OPTIONS.indexOf(targetRoundCount);
+    setRoundByIndex((currentIndex < 0 ? 0 : currentIndex) + delta);
+  }
+
+  function scrollFieldIntoView(position: 'start' | 'middle' | 'end') {
+    requestAnimationFrame(() => {
+      if (position === 'start') {
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
+        return;
+      }
+      if (position === 'middle') {
+        scrollRef.current?.scrollTo({ y: 90, animated: true });
+        return;
+      }
+      scrollRef.current?.scrollToEnd({ animated: true });
+    });
+  }
+
+  function focusNext(ref: RefObject<TextInput | null>) {
+    ref.current?.focus();
   }
 
   function handleStart() {
@@ -165,15 +174,16 @@ export function NewGameScreen({ onBack, onStart }: NewGameScreenProps) {
   }
 
   const isPaired = gameMode === 'paired';
+  const roundIndex = TARGET_ROUND_COUNT_OPTIONS.indexOf(targetRoundCount);
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={0}
       >
-        <View style={styles.header}>
+        <View style={[styles.header, compact && styles.headerCompact]}>
           <Pressable
             accessibilityRole="button"
             onPress={onBack}
@@ -185,140 +195,294 @@ export function NewGameScreen({ onBack, onStart }: NewGameScreenProps) {
           >
             <Text style={styles.backLabel}>‹</Text>
           </Pressable>
-          <View style={styles.titleBlock}>
-            <Text style={styles.title}>YENİ OYUN</Text>
-            <View style={styles.goldRule} />
-            <Text style={styles.subtitle}>
-              Eşli veya tekli yeni oyun oluştur.
-            </Text>
-          </View>
+          <Text style={styles.title}>Yeni Oyun</Text>
           <View style={styles.backSpacer} />
         </View>
 
         <View style={styles.sheet}>
-          <Text style={styles.sectionTitle}>OYUN TÜRÜ</Text>
-          <View style={styles.segmentRow}>
-            <Segment
-              label={gameModeShortLabel('paired')}
-              selected={gameMode === 'paired'}
-              onPress={() => handleSelectGameMode('paired')}
-            />
-            <Segment
-              label={gameModeShortLabel('individual')}
-              selected={gameMode === 'individual'}
-              onPress={() => handleSelectGameMode('individual')}
-            />
-          </View>
-
-          <View style={styles.divider} />
-
-          <Text style={styles.sectionTitle}>
-            {isPaired ? 'TAKIMLAR' : 'OYUNCULAR'}
-          </Text>
-
-          {isPaired ? (
-            <View style={styles.teamsRow}>
-              <View style={styles.teamCol}>
-                <Text style={styles.teamHeading}>Takım 1</Text>
-                <View style={styles.teamUnderline} />
-                <CompactField
-                  label="Takım"
-                  value={form.team1Name}
-                  onChangeText={(value) => updateField('team1Name', value)}
-                />
-                <CompactField
-                  label="Oyuncu 1"
-                  value={form.player1Name}
-                  onChangeText={(value) => updateField('player1Name', value)}
-                />
-                <CompactField
-                  label="Oyuncu 2"
-                  value={form.player2Name}
-                  onChangeText={(value) => updateField('player2Name', value)}
-                />
+          <ScrollView
+            ref={scrollRef}
+            style={styles.formScroll}
+            contentContainerStyle={[
+              styles.formContent,
+              compact && styles.formContentCompact,
+            ]}
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="interactive"
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
+            <Pressable accessible={false} onPress={Keyboard.dismiss}>
+              <Text style={styles.sectionTitle}>Oyun Tipi</Text>
+              <View style={styles.segment}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => handleSelectGameMode('paired')}
+                  style={({ pressed }) => [
+                    styles.segmentItem,
+                    isPaired && styles.segmentItemSelected,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.segmentIcon,
+                      isPaired && styles.segmentIconSelected,
+                    ]}
+                  >
+                    👥
+                  </Text>
+                  <Text
+                    style={[
+                      styles.segmentLabel,
+                      isPaired && styles.segmentLabelSelected,
+                    ]}
+                  >
+                    {gameModeShortLabel('paired')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => handleSelectGameMode('individual')}
+                  style={({ pressed }) => [
+                    styles.segmentItem,
+                    !isPaired && styles.segmentItemSelected,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.segmentIcon,
+                      !isPaired && styles.segmentIconSelected,
+                    ]}
+                  >
+                    👤
+                  </Text>
+                  <Text
+                    style={[
+                      styles.segmentLabel,
+                      !isPaired && styles.segmentLabelSelected,
+                    ]}
+                  >
+                    {gameModeShortLabel('individual')}
+                  </Text>
+                </Pressable>
               </View>
-              <View style={styles.teamGoldDivider} />
-              <View style={styles.teamCol}>
-                <Text style={styles.teamHeading}>Takım 2</Text>
-                <View style={styles.teamUnderline} />
-                <CompactField
-                  label="Takım"
-                  value={form.team2Name}
-                  onChangeText={(value) => updateField('team2Name', value)}
-                />
-                <CompactField
-                  label="Oyuncu 3"
-                  value={form.player3Name}
-                  onChangeText={(value) => updateField('player3Name', value)}
-                />
-                <CompactField
-                  label="Oyuncu 4"
-                  value={form.player4Name}
-                  onChangeText={(value) => updateField('player4Name', value)}
-                />
+
+              <Text style={styles.sectionTitle}>
+                {isPaired ? 'Takımlar' : 'Oyuncular'}
+              </Text>
+
+              {isPaired ? (
+                <View style={styles.teamsRow}>
+                  <View style={styles.teamCard}>
+                    <Text style={styles.teamHeading}>Takım 1</Text>
+                    <CompactInput
+                      label="Takım"
+                      value={form.team1Name}
+                      onChangeText={(value) => updateField('team1Name', value)}
+                      inputRef={team1Ref}
+                      onSubmitEditing={() => focusNext(p1Ref)}
+                      onFocus={() => scrollFieldIntoView('start')}
+                    />
+                    <CompactInput
+                      label="Oyuncu"
+                      value={form.player1Name}
+                      onChangeText={(value) =>
+                        updateField('player1Name', value)
+                      }
+                      inputRef={p1Ref}
+                      onSubmitEditing={() => focusNext(p2Ref)}
+                      onFocus={() => scrollFieldIntoView('start')}
+                    />
+                    <CompactInput
+                      label="Oyuncu"
+                      value={form.player2Name}
+                      onChangeText={(value) =>
+                        updateField('player2Name', value)
+                      }
+                      inputRef={p2Ref}
+                      onSubmitEditing={() => focusNext(team2Ref)}
+                      onFocus={() => scrollFieldIntoView('middle')}
+                    />
+                  </View>
+
+                  <View style={styles.teamCard}>
+                    <Text style={styles.teamHeading}>Takım 2</Text>
+                    <CompactInput
+                      label="Takım"
+                      value={form.team2Name}
+                      onChangeText={(value) => updateField('team2Name', value)}
+                      inputRef={team2Ref}
+                      onSubmitEditing={() => focusNext(p3Ref)}
+                      onFocus={() => scrollFieldIntoView('middle')}
+                    />
+                    <CompactInput
+                      label="Oyuncu"
+                      value={form.player3Name}
+                      onChangeText={(value) =>
+                        updateField('player3Name', value)
+                      }
+                      inputRef={p3Ref}
+                      onSubmitEditing={() => focusNext(p4Ref)}
+                      onFocus={() => scrollFieldIntoView('end')}
+                    />
+                    <CompactInput
+                      label="Oyuncu"
+                      value={form.player4Name}
+                      onChangeText={(value) =>
+                        updateField('player4Name', value)
+                      }
+                      inputRef={p4Ref}
+                      returnKeyType="done"
+                      onSubmitEditing={Keyboard.dismiss}
+                      onFocus={() => scrollFieldIntoView('end')}
+                    />
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.playersGrid}>
+                  <View style={styles.playerCard}>
+                    <CompactInput
+                      label="Oyuncu 1"
+                      value={form.player1Name}
+                      onChangeText={(value) =>
+                        updateField('player1Name', value)
+                      }
+                      inputRef={p1Ref}
+                      onSubmitEditing={() => focusNext(p2Ref)}
+                      onFocus={() => scrollFieldIntoView('start')}
+                    />
+                    <CompactInput
+                      label="Oyuncu 2"
+                      value={form.player2Name}
+                      onChangeText={(value) =>
+                        updateField('player2Name', value)
+                      }
+                      inputRef={p2Ref}
+                      onSubmitEditing={() => focusNext(p3Ref)}
+                      onFocus={() => scrollFieldIntoView('middle')}
+                    />
+                  </View>
+                  <View style={styles.playerCard}>
+                    <CompactInput
+                      label="Oyuncu 3"
+                      value={form.player3Name}
+                      onChangeText={(value) =>
+                        updateField('player3Name', value)
+                      }
+                      inputRef={p3Ref}
+                      onSubmitEditing={() => focusNext(p4Ref)}
+                      onFocus={() => scrollFieldIntoView('end')}
+                    />
+                    <CompactInput
+                      label="Oyuncu 4"
+                      value={form.player4Name}
+                      onChangeText={(value) =>
+                        updateField('player4Name', value)
+                      }
+                      inputRef={p4Ref}
+                      returnKeyType="done"
+                      onSubmitEditing={Keyboard.dismiss}
+                      onFocus={() => scrollFieldIntoView('end')}
+                    />
+                  </View>
+                </View>
+              )}
+
+              <View style={styles.roundRow}>
+                <Text style={styles.roundLabel}>Hedef El Sayısı</Text>
+                <View style={styles.stepper}>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={roundIndex <= 0}
+                    onPress={() => stepRound(-1)}
+                    style={({ pressed }) => [
+                      styles.stepButton,
+                      roundIndex <= 0 && styles.stepButtonDisabled,
+                      pressed && roundIndex > 0 && styles.pressed,
+                    ]}
+                  >
+                    <Text style={styles.stepButtonLabel}>−</Text>
+                  </Pressable>
+                  <View style={styles.stepValueBox}>
+                    <Text style={styles.stepValue}>{targetRoundCount}</Text>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={roundIndex >= TARGET_ROUND_COUNT_OPTIONS.length - 1}
+                    onPress={() => stepRound(1)}
+                    style={({ pressed }) => [
+                      styles.stepButton,
+                      roundIndex >= TARGET_ROUND_COUNT_OPTIONS.length - 1 &&
+                        styles.stepButtonDisabled,
+                      pressed &&
+                        roundIndex < TARGET_ROUND_COUNT_OPTIONS.length - 1 &&
+                        styles.pressed,
+                    ]}
+                  >
+                    <Text style={styles.stepButtonLabel}>+</Text>
+                  </Pressable>
+                </View>
               </View>
-            </View>
-          ) : (
-            <View style={styles.playersCol}>
-              <CompactField
-                label="Oyuncu 1"
-                value={form.player1Name}
-                onChangeText={(value) => updateField('player1Name', value)}
-              />
-              <CompactField
-                label="Oyuncu 2"
-                value={form.player2Name}
-                onChangeText={(value) => updateField('player2Name', value)}
-              />
-              <CompactField
-                label="Oyuncu 3"
-                value={form.player3Name}
-                onChangeText={(value) => updateField('player3Name', value)}
-              />
-              <CompactField
-                label="Oyuncu 4"
-                value={form.player4Name}
-                onChangeText={(value) => updateField('player4Name', value)}
-              />
-            </View>
-          )}
 
-          <View style={styles.divider} />
+              <View style={styles.quickRow}>
+                {TARGET_ROUND_COUNT_OPTIONS.map((option) => {
+                  const selected = targetRoundCount === option;
+                  return (
+                    <Pressable
+                      key={option}
+                      accessibilityRole="button"
+                      onPress={() => setRoundByIndex(
+                        TARGET_ROUND_COUNT_OPTIONS.indexOf(option),
+                      )}
+                      style={({ pressed }) => [
+                        styles.quickChip,
+                        selected && styles.quickChipSelected,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.quickChipLabel,
+                          selected && styles.quickChipLabelSelected,
+                        ]}
+                      >
+                        {option}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
 
-          <Text style={styles.sectionTitle}>HEDEF EL</Text>
-          <View style={styles.chipRow}>
-            {TARGET_ROUND_COUNT_OPTIONS.map((option) => (
-              <Chip
-                key={option}
-                label={`${option}`}
-                selected={targetRoundCount === option}
-                onPress={() => handleSelectRoundCount(option)}
-              />
-            ))}
-          </View>
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+            </Pressable>
+          </ScrollView>
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-
-          <View style={styles.footer}>
+          <View style={[styles.footer, compact && styles.footerCompact]}>
             <Pressable
               accessibilityRole="button"
               onPress={handleStart}
               style={({ pressed }) => [
                 styles.primaryButton,
+                compact && styles.primaryButtonCompact,
                 pressed && styles.pressed,
               ]}
             >
-              <Text style={styles.primaryLabel}>OYUNU BAŞLAT</Text>
+              <Text style={styles.primaryLabel}>Oyunu Başlat</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              onPress={onBack}
+              onPress={() => {
+                Keyboard.dismiss();
+                onBack();
+              }}
               style={({ pressed }) => [
-                styles.secondaryButton,
+                styles.cancelButton,
                 pressed && styles.pressed,
               ]}
             >
-              <Text style={styles.secondaryLabel}>İptal</Text>
+              <Text style={styles.cancelLabel}>İptal</Text>
             </Pressable>
           </View>
         </View>
@@ -337,9 +501,14 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    minHeight: 44,
     paddingHorizontal: 8,
-    paddingBottom: 12,
+    paddingBottom: 8,
+    backgroundColor: ui.green,
+  },
+  headerCompact: {
+    paddingBottom: 4,
   },
   backButton: {
     width: 40,
@@ -353,66 +522,71 @@ const styles = StyleSheet.create({
   backLabel: {
     fontSize: 32,
     fontWeight: '300',
-    color: ui.gold,
+    color: ui.white,
     marginTop: -2,
   },
-  titleBlock: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
-    paddingTop: 4,
-  },
   title: {
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: 1.4,
-    color: ui.gold,
-  },
-  goldRule: {
-    width: 48,
-    height: 2,
-    backgroundColor: ui.gold,
-    borderRadius: 1,
-  },
-  subtitle: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: 'rgba(247, 242, 232, 0.78)',
+    flex: 1,
     textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '700',
+    color: ui.white,
   },
   sheet: {
     flex: 1,
+    minHeight: 0,
     backgroundColor: ui.cream,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
+  },
+  formScroll: {
+    flex: 1,
+    minHeight: 0,
+  },
+  formContent: {
     paddingHorizontal: 14,
     paddingTop: 14,
     paddingBottom: 12,
+    gap: 10,
+  },
+  formContentCompact: {
+    paddingTop: 10,
     gap: 8,
   },
   sectionTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    color: ui.green,
-  },
-  segmentRow: {
-    flexDirection: 'row',
-    gap: 8,
+    fontSize: 12,
+    fontWeight: '700',
+    color: ui.text,
+    marginBottom: 6,
   },
   segment: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: ui.green,
+    flexDirection: 'row',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: ui.gold,
+    overflow: 'hidden',
     backgroundColor: ui.white,
+    marginBottom: 4,
+  },
+  segmentItem: {
+    flex: 1,
+    minHeight: 46,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
+    backgroundColor: ui.creamCard,
+    paddingHorizontal: 8,
   },
-  segmentSelected: {
+  segmentItemSelected: {
     backgroundColor: ui.green,
-    borderColor: ui.gold,
+  },
+  segmentIcon: {
+    fontSize: 14,
+  },
+  segmentIconSelected: {
+    opacity: 1,
   },
   segmentLabel: {
     fontSize: 15,
@@ -422,83 +596,141 @@ const styles = StyleSheet.create({
   segmentLabelSelected: {
     color: ui.white,
   },
-  divider: {
-    height: 1.5,
-    backgroundColor: ui.gold,
-    opacity: 0.7,
-    marginVertical: 2,
-  },
   teamsRow: {
     flexDirection: 'row',
     gap: 10,
   },
-  teamCol: {
+  teamCard: {
     flex: 1,
-    gap: 6,
-  },
-  teamGoldDivider: {
-    width: 1.5,
-    backgroundColor: ui.gold,
-    alignSelf: 'stretch',
+    backgroundColor: ui.creamCard,
+    borderWidth: 1.5,
+    borderColor: ui.gold,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    paddingBottom: 6,
+    gap: 4,
   },
   teamHeading: {
     fontSize: 12,
     fontWeight: '800',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
     color: ui.gold,
     textAlign: 'center',
-  },
-  teamUnderline: {
-    height: 1.5,
-    backgroundColor: ui.gold,
-    opacity: 0.8,
     marginBottom: 2,
   },
-  playersCol: {
-    gap: 6,
+  playersGrid: {
+    flexDirection: 'row',
+    gap: 10,
   },
-  field: {
+  playerCard: {
+    flex: 1,
+    backgroundColor: ui.creamCard,
+    borderWidth: 1.5,
+    borderColor: ui.gold,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    gap: 4,
+  },
+  fieldRow: {
     gap: 2,
   },
   fieldLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
     color: ui.textMuted,
   },
   fieldInput: {
-    minHeight: 36,
+    height: 34,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: ui.border,
     backgroundColor: ui.white,
     paddingHorizontal: 8,
     color: ui.text,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
+    paddingVertical: 0,
   },
-  chipRow: {
+  roundRow: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    gap: 10,
   },
-  chip: {
+  roundLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: ui.text,
+    flexShrink: 1,
+  },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  stepButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: ui.gold,
+    backgroundColor: ui.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepButtonDisabled: {
+    opacity: 0.35,
+  },
+  stepButtonLabel: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: ui.green,
+    marginTop: -1,
+  },
+  stepValueBox: {
+    minWidth: 48,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: ui.gold,
+    backgroundColor: ui.creamCard,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  stepValue: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: ui.green,
+  },
+  quickRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  quickChip: {
     flex: 1,
-    minHeight: 40,
-    borderRadius: 10,
+    height: 32,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: ui.border,
     backgroundColor: ui.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  chipSelected: {
+  quickChipSelected: {
     backgroundColor: ui.green,
     borderColor: ui.gold,
   },
-  chipLabel: {
-    fontSize: 15,
+  quickChipLabel: {
+    fontSize: 13,
     fontWeight: '700',
     color: ui.text,
   },
-  chipLabelSelected: {
+  quickChipLabelSelected: {
     color: ui.white,
   },
   error: {
@@ -511,39 +743,47 @@ const styles = StyleSheet.create({
     borderColor: ui.gold,
     paddingHorizontal: 10,
     paddingVertical: 6,
+    marginTop: 4,
   },
   footer: {
-    marginTop: 'auto',
-    gap: 8,
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 10,
+    gap: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: ui.goldSoft,
+    backgroundColor: ui.cream,
+  },
+  footerCompact: {
+    paddingTop: 6,
+    paddingBottom: 8,
   },
   primaryButton: {
-    minHeight: 52,
-    borderRadius: 10,
+    minHeight: 50,
+    borderRadius: 12,
     backgroundColor: ui.green,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: ui.gold,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  primaryButtonCompact: {
+    minHeight: 46,
+  },
   primaryLabel: {
     fontSize: 16,
     fontWeight: '800',
-    letterSpacing: 0.8,
     color: ui.white,
   },
-  secondaryButton: {
-    minHeight: 46,
-    borderRadius: 10,
-    backgroundColor: ui.white,
-    borderWidth: 1,
-    borderColor: ui.green,
+  cancelButton: {
+    minHeight: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: ui.green,
+  cancelLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: ui.textMuted,
   },
   pressed: {
     opacity: 0.82,
