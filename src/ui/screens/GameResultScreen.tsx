@@ -1,39 +1,77 @@
-import {
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { useMemo } from 'react';
 
 import { DEVELOPER_CREDIT } from '../../config/appInfo';
-import { PrimaryButton } from '../components/PrimaryButton';
 import { calculateGameResult } from '../gameResult';
-import { colors, radii, spacing, typography } from '../theme';
 import { ActiveGameData } from './ActiveGameScreen';
+
+/** Referans Oyun Bitti paleti. */
+const ui = {
+  green: '#1F5E3B',
+  greenDeep: '#174A2E',
+  cream: '#F7F2E8',
+  gold: '#C8A44D',
+  silver: '#A8B0B5',
+  bronze: '#B08D57',
+  white: '#FFFFFF',
+  text: '#263238',
+  textMuted: '#7A847C',
+  line: '#D9D2C4',
+} as const;
 
 type GameResultScreenProps = {
   game: ActiveGameData;
   seriesSummaryLine?: string | null;
   onRematch: () => void;
   onViewTournament: () => void;
-  onNewTeams: () => void;
+  onHome: () => void;
 };
+
+type ParsedSeries =
+  | { kind: 'paired'; teamA: string; winsA: string; winsB: string; teamB: string }
+  | { kind: 'individual'; line: string };
+
+function parseSeriesSummary(line: string | null | undefined): ParsedSeries | null {
+  if (!line) {
+    return null;
+  }
+  const paired = line.match(/^(.+?)\s+(\d+)\s+-\s+(\d+)\s+(.+)$/);
+  if (paired) {
+    return {
+      kind: 'paired',
+      teamA: paired[1],
+      winsA: paired[2],
+      winsB: paired[3],
+      teamB: paired[4],
+    };
+  }
+  return { kind: 'individual', line };
+}
+
+function rankTone(rank: number): 'gold' | 'silver' | 'bronze' | 'normal' {
+  if (rank === 1) {
+    return 'gold';
+  }
+  if (rank === 2) {
+    return 'silver';
+  }
+  if (rank === 3) {
+    return 'bronze';
+  }
+  return 'normal';
+}
 
 export function GameResultScreen({
   game,
   seriesSummaryLine,
   onRematch,
   onViewTournament,
-  onNewTeams,
+  onHome,
 }: GameResultScreenProps) {
-  const { height } = useWindowDimensions();
-  const compact = height < 720;
   const result = useMemo(() => calculateGameResult(game), [game]);
   const isIndividual = result.mode === 'individual';
   const isTie = result.isTie;
+  const series = parseSeriesSummary(seriesSummaryLine);
 
   const winnerTitle = isIndividual
     ? isTie
@@ -45,117 +83,174 @@ export function GameResultScreen({
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={[styles.shell, compact && styles.shellCompact]}>
-        <View style={[styles.heroArt, compact && styles.heroArtCompact]}>
-          <View style={styles.tileMotifRow}>
-            <View style={[styles.tileMotif, styles.tileA]} />
-            <View style={[styles.tileMotif, styles.tileB]} />
-            <View style={[styles.tileMotif, styles.tileC]} />
-          </View>
-          <Text style={styles.brand}>101 YAZ-BOZ</Text>
-          <Text style={styles.kicker}>Oyun Bitti</Text>
-          <Text style={styles.trophy}>{isTie ? '🤝' : '🏆'}</Text>
-          <Text style={styles.heroLabel}>{winnerTitle}</Text>
+      <View style={styles.shell}>
+        <View style={styles.hero}>
+          <Text style={styles.trophy}>🏆</Text>
+          <Text style={styles.kicker}>OYUN BİTTİ</Text>
+          <Text style={styles.winnerLabel}>{winnerTitle}</Text>
 
           {isIndividual ? (
             result.individualWinner?.kind === 'tie' ? (
               <View style={styles.tieBlock}>
                 {result.individualWinner.players.map((row) => (
                   <Text key={row.playerId} style={styles.winnerName}>
-                    {row.name} · {row.totalScore}
+                    {row.name}
                   </Text>
                 ))}
               </View>
             ) : result.individualWinner?.kind === 'winner' ? (
-              <>
-                <Text style={styles.winnerName} numberOfLines={1}>
-                  {result.individualWinner.name}
-                </Text>
-                <Text style={styles.winnerScore}>
-                  {result.individualWinner.totalScore}
-                </Text>
-              </>
+              <Text style={styles.winnerName} numberOfLines={2}>
+                {result.individualWinner.name}
+              </Text>
             ) : null
           ) : result.pairedWinner?.kind === 'tie' ? (
             <View style={styles.tieBlock}>
-              <Text style={styles.winnerName}>
-                {result.pairedWinner.team1Name} {result.pairedWinner.team1Score}
+              <Text style={styles.winnerName} numberOfLines={1}>
+                {result.pairedWinner.team1Name}
               </Text>
-              <Text style={styles.winnerName}>
-                {result.pairedWinner.team2Name} {result.pairedWinner.team2Score}
+              <Text style={styles.winnerName} numberOfLines={1}>
+                {result.pairedWinner.team2Name}
               </Text>
             </View>
           ) : result.pairedWinner?.kind === 'winner' ? (
-            <>
-              <Text style={styles.winnerName} numberOfLines={2}>
-                {result.pairedWinner.teamName}
-              </Text>
-              <Text style={styles.winnerScore}>
-                {result.pairedWinner.teamScore}
-              </Text>
-              <Text style={styles.otherLine}>
-                {result.pairedWinner.otherTeamName}{' '}
-                {result.pairedWinner.otherTeamScore}
-              </Text>
-            </>
+            <Text style={styles.winnerName} numberOfLines={2}>
+              {result.pairedWinner.teamName}
+            </Text>
           ) : null}
 
-          <Text style={styles.hint}>Düşük ceza puanı avantajlıdır</Text>
+          <Text style={styles.hint}>Düşük ceza puanı kazanır.</Text>
         </View>
 
-        <View style={styles.rankCard}>
-          <Text style={styles.rankTitle}>Sıralama</Text>
-          {result.standings.map((row) => (
-            <View key={row.playerId} style={styles.rankRow}>
-              <Text style={styles.rankPos}>
-                {row.rank === 1 && !isTie ? '🏆' : `${row.rank}.`}
-              </Text>
-              <Text style={styles.rankName} numberOfLines={1}>
-                {row.name}
-              </Text>
-              <Text style={styles.rankScore}>{row.totalScore}</Text>
+        <View style={styles.panel}>
+          <View style={styles.rankHeader}>
+            <Text style={[styles.colRank, styles.headerCell]}>Sıra</Text>
+            <Text style={[styles.colName, styles.headerCell]}>Oyuncu</Text>
+            <Text style={[styles.colScore, styles.headerCell]}>Puan</Text>
+          </View>
+
+          {result.standings.map((row, index) => {
+            const tone = rankTone(row.rank);
+            const isLast = index === result.standings.length - 1;
+            return (
+              <View
+                key={row.playerId}
+                style={[
+                  styles.rankRow,
+                  tone === 'gold' && styles.rankGold,
+                  tone === 'silver' && styles.rankSilver,
+                  tone === 'bronze' && styles.rankBronze,
+                  isLast && !isIndividual && styles.rankRowBeforeTeams,
+                  isLast && isIndividual && styles.rankRowLast,
+                ]}
+              >
+                <View style={styles.colRank}>
+                  <View
+                    style={[
+                      styles.rankBadge,
+                      tone === 'gold' && styles.badgeGold,
+                      tone === 'silver' && styles.badgeSilver,
+                      tone === 'bronze' && styles.badgeBronze,
+                      tone === 'normal' && styles.badgeNormal,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.rankBadgeText,
+                        tone === 'normal' && styles.rankBadgeTextNormal,
+                      ]}
+                    >
+                      {row.rank}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.colName} numberOfLines={1}>
+                  {row.name}
+                </Text>
+                <Text style={styles.colScore}>{row.totalScore}</Text>
+              </View>
+            );
+          })}
+
+          {!isIndividual ? (
+            <View style={styles.teamBoxes}>
+              <View style={styles.teamBox}>
+                <Text style={styles.teamBoxLabel} numberOfLines={1}>
+                  {game.teams[0].name}
+                </Text>
+                <Text style={styles.teamBoxScore}>
+                  {game.teams[0].totalScore}
+                </Text>
+              </View>
+              <View style={styles.teamBoxDivider} />
+              <View style={styles.teamBox}>
+                <Text style={styles.teamBoxLabel} numberOfLines={1}>
+                  {game.teams[1].name}
+                </Text>
+                <Text style={styles.teamBoxScore}>
+                  {game.teams[1].totalScore}
+                </Text>
+              </View>
             </View>
-          ))}
+          ) : null}
+
+          {series ? (
+            <View style={styles.seriesBlock}>
+              <Text style={styles.seriesTitle}>Turnuva Durumu</Text>
+              {series.kind === 'paired' ? (
+                <View style={styles.seriesRow}>
+                  <Text style={styles.seriesTeam} numberOfLines={2}>
+                    {series.teamA}
+                  </Text>
+                  <Text style={styles.seriesWins}>{series.winsA}</Text>
+                  <Text style={styles.seriesDash}>—</Text>
+                  <Text style={styles.seriesWins}>{series.winsB}</Text>
+                  <Text style={styles.seriesTeam} numberOfLines={2}>
+                    {series.teamB}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.seriesLeader} numberOfLines={2}>
+                  {series.line}
+                </Text>
+              )}
+            </View>
+          ) : null}
         </View>
 
-        {seriesSummaryLine ? (
-          <View style={styles.seriesCard}>
-            <Text style={styles.seriesLabel}>Turnuva</Text>
-            <Text style={styles.seriesLine} numberOfLines={2}>
-              {seriesSummaryLine}
-            </Text>
-          </View>
-        ) : null}
-
-        <View style={styles.footer}>
-          <PrimaryButton
-            label="Aynı Oyuncularla Yeni Oyun"
+        <View style={styles.actions}>
+          <Pressable
+            accessibilityRole="button"
             onPress={onRematch}
-          />
-          <View style={styles.secondaryRow}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={onViewTournament}
-              style={({ pressed }) => [
-                styles.secondaryChip,
-                pressed && styles.secondaryPressed,
-              ]}
-            >
-              <Text style={styles.secondaryChipLabel}>Turnuva</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={onNewTeams}
-              style={({ pressed }) => [
-                styles.secondaryChip,
-                pressed && styles.secondaryPressed,
-              ]}
-            >
-              <Text style={styles.secondaryChipLabel}>Yeni Kadro</Text>
-            </Pressable>
-          </View>
-          <Text style={styles.credit}>{DEVELOPER_CREDIT}</Text>
+            style={({ pressed }) => [
+              styles.primaryButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.primaryLabel}>Aynı Oyuncularla Yeni Oyun</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onViewTournament}
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.secondaryLabel}>Turnuva Geçmişi</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onHome}
+            style={({ pressed }) => [
+              styles.tertiaryButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.tertiaryLabel}>Ana Sayfa</Text>
+          </Pressable>
         </View>
+
+        <Text style={styles.credit}>{DEVELOPER_CREDIT}</Text>
       </View>
     </SafeAreaView>
   );
@@ -164,87 +259,44 @@ export function GameResultScreen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: ui.green,
   },
   shell: {
     flex: 1,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
-    gap: spacing.sm,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+    gap: 10,
   },
-  shellCompact: {
-    gap: spacing.xs,
-  },
-  heroArt: {
-    backgroundColor: colors.primary,
-    borderRadius: radii.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
+  hero: {
     alignItems: 'center',
-    overflow: 'hidden',
-    gap: 4,
+    gap: 2,
+    paddingTop: 4,
   },
-  heroArtCompact: {
-    paddingVertical: spacing.sm,
-  },
-  tileMotifRow: {
-    position: 'absolute',
-    right: -8,
-    top: -8,
-    flexDirection: 'row',
-    gap: 6,
-    opacity: 0.22,
-  },
-  tileMotif: {
-    width: 36,
-    height: 48,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: colors.textOnPrimary,
-  },
-  tileA: { transform: [{ rotate: '12deg' }] },
-  tileB: { transform: [{ rotate: '-8deg' }], marginTop: 10 },
-  tileC: { transform: [{ rotate: '18deg' }], marginTop: 4 },
-  brand: {
-    ...typography.brand,
-    color: colors.textOnPrimary,
-    opacity: 0.85,
+  trophy: {
+    fontSize: 44,
+    lineHeight: 50,
   },
   kicker: {
     fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    color: ui.white,
+    marginTop: 2,
+  },
+  winnerLabel: {
+    fontSize: 12,
     fontWeight: '600',
-    color: colors.textOnPrimary,
-    opacity: 0.9,
-  },
-  trophy: {
-    fontSize: 40,
-    lineHeight: 46,
-  },
-  heroLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textOnPrimary,
-    opacity: 0.9,
+    color: 'rgba(247, 242, 232, 0.78)',
+    marginTop: 4,
   },
   winnerName: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '800',
-    lineHeight: 32,
-    color: colors.textOnPrimary,
+    lineHeight: 34,
+    color: ui.gold,
     textAlign: 'center',
-  },
-  winnerScore: {
-    fontSize: 36,
-    fontWeight: '800',
-    lineHeight: 40,
-    color: colors.textOnPrimary,
-  },
-  otherLine: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textOnPrimary,
-    opacity: 0.85,
+    marginTop: 2,
   },
   tieBlock: {
     alignItems: 'center',
@@ -252,96 +304,225 @@ const styles = StyleSheet.create({
   },
   hint: {
     fontSize: 11,
-    fontWeight: '600',
-    color: colors.textOnPrimary,
-    opacity: 0.75,
-    marginTop: 2,
+    fontWeight: '500',
+    color: 'rgba(247, 242, 232, 0.7)',
+    marginTop: 6,
   },
-  rankCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
+  panel: {
+    backgroundColor: ui.cream,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    gap: 2,
+    borderColor: ui.gold,
+    overflow: 'hidden',
+    flexShrink: 1,
   },
-  rankTitle: {
-    ...typography.infoLabel,
-    color: colors.primary,
-    marginBottom: 2,
+  rankHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 30,
+    paddingHorizontal: 12,
+    backgroundColor: '#EFE8DB',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: ui.line,
+  },
+  headerCell: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: ui.green,
   },
   rankRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 26,
-    gap: spacing.sm,
+    minHeight: 36,
+    paddingHorizontal: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: ui.line,
   },
-  rankPos: {
-    width: 28,
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.primary,
+  rankRowBeforeTeams: {
+    borderBottomWidth: 0,
   },
-  rankName: {
+  rankRowLast: {
+    borderBottomWidth: 0,
+  },
+  rankGold: {
+    backgroundColor: 'rgba(200, 164, 77, 0.18)',
+  },
+  rankSilver: {
+    backgroundColor: 'rgba(168, 176, 181, 0.22)',
+  },
+  rankBronze: {
+    backgroundColor: 'rgba(176, 141, 87, 0.18)',
+  },
+  colRank: {
+    width: 36,
+  },
+  colName: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-    color: colors.text,
+    color: ui.text,
+    paddingRight: 8,
   },
-  rankScore: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.textSecondary,
-  },
-  seriesCard: {
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  seriesLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  seriesLine: {
+  colScore: {
+    minWidth: 44,
+    textAlign: 'right',
     fontSize: 14,
     fontWeight: '700',
-    color: colors.text,
+    color: ui.green,
   },
-  footer: {
-    marginTop: 'auto',
-    gap: spacing.xs,
-  },
-  secondaryRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  secondaryChip: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+  rankBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryPressed: {
-    backgroundColor: colors.surfaceElevated,
+  badgeGold: {
+    backgroundColor: ui.gold,
   },
-  secondaryChipLabel: {
-    ...typography.buttonSecondary,
-    color: colors.primary,
+  badgeSilver: {
+    backgroundColor: ui.silver,
+  },
+  badgeBronze: {
+    backgroundColor: ui.bronze,
+  },
+  badgeNormal: {
+    backgroundColor: 'transparent',
+  },
+  rankBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: ui.white,
+  },
+  rankBadgeTextNormal: {
+    color: ui.textMuted,
+  },
+  teamBoxes: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: ui.gold,
+    minHeight: 52,
+  },
+  teamBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    gap: 2,
+  },
+  teamBoxDivider: {
+    width: 1.5,
+    backgroundColor: ui.gold,
+  },
+  teamBoxLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    color: ui.textMuted,
+    textAlign: 'center',
+  },
+  teamBoxScore: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: ui.green,
+  },
+  seriesBlock: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: ui.line,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 6,
+  },
+  seriesTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    color: ui.green,
+    textAlign: 'center',
+  },
+  seriesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  seriesTeam: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: ui.text,
+    textAlign: 'center',
+  },
+  seriesWins: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: ui.green,
+    minWidth: 24,
+    textAlign: 'center',
+  },
+  seriesDash: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: ui.gold,
+  },
+  seriesLeader: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: ui.text,
+    textAlign: 'center',
+  },
+  actions: {
+    gap: 8,
+    marginTop: 'auto',
+  },
+  primaryButton: {
+    minHeight: 50,
+    borderRadius: 10,
+    backgroundColor: ui.greenDeep,
+    borderWidth: 1,
+    borderColor: ui.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  primaryLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: ui.white,
+    textAlign: 'center',
+  },
+  secondaryButton: {
+    minHeight: 46,
+    borderRadius: 10,
+    backgroundColor: ui.cream,
+    borderWidth: 1,
+    borderColor: ui.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: ui.green,
+  },
+  tertiaryButton: {
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tertiaryLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(247, 242, 232, 0.85)',
   },
   credit: {
     fontSize: 11,
     fontWeight: '500',
-    color: colors.textSecondary,
+    color: 'rgba(247, 242, 232, 0.55)',
     textAlign: 'center',
-    opacity: 0.75,
+  },
+  pressed: {
+    opacity: 0.82,
   },
 });

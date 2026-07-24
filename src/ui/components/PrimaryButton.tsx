@@ -36,25 +36,20 @@ export function PrimaryButton({
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 58,
+    minHeight: 52,
     borderRadius: radii.md,
     backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: colors.goldMuted,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    elevation: 4,
   },
   pressed: {
     backgroundColor: colors.primaryPressed,
   },
   disabled: {
-    opacity: 0.45,
-    elevation: 0,
-    shadowOpacity: 0,
+    opacity: 0.4,
   },
   label: {
     ...typography.button,

@@ -1,48 +1,89 @@
-import {
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 
 import { APP_INFO, DEVELOPER_CREDIT } from '../../config/appInfo';
-import { colors, radii, spacing, typography } from '../theme';
+
+/** Home ile aynı referans paleti. */
+const ui = {
+  green: '#1F5E3B',
+  cream: '#F7F2E8',
+  gold: '#C8A44D',
+  white: '#FFFFFF',
+  text: '#263238',
+  textMuted: '#7A847C',
+  line: '#D9D2C4',
+} as const;
 
 type AboutScreenProps = {
   onBack: () => void;
 };
 
+function InfoRow({
+  label,
+  value,
+  last = false,
+}: {
+  label: string;
+  value: string;
+  last?: boolean;
+}) {
+  return (
+    <View style={[styles.infoRow, last && styles.infoRowLast]}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue}>{value}</Text>
+    </View>
+  );
+}
+
 export function AboutScreen({ onBack }: AboutScreenProps) {
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={styles.header}>
         <Pressable
           accessibilityRole="button"
           onPress={onBack}
-          style={({ pressed }) => [
-            styles.backButton,
-            pressed && styles.backPressed,
-          ]}
+          hitSlop={8}
+          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
         >
-          <Text style={styles.backLabel}>Geri</Text>
+          <Text style={styles.backLabel}>‹</Text>
         </Pressable>
+        <View style={styles.titleBlock}>
+          <Text style={styles.title}>HAKKINDA</Text>
+          <View style={styles.goldRule} />
+        </View>
+        <View style={styles.backSpacer} />
+      </View>
 
-        <View style={styles.hero}>
-          <Text style={styles.brand}>{APP_INFO.name}</Text>
-          <Text style={styles.version}>Sürüm {APP_INFO.version}</Text>
-          <Text style={styles.credit}>{DEVELOPER_CREDIT}</Text>
-          <Text style={styles.copyright}>
-            © {APP_INFO.copyrightYear}
-          </Text>
+      <View style={styles.sheet}>
+        <Text style={styles.brand}>{APP_INFO.name}</Text>
+        <Text style={styles.description}>
+          Eşli ve Tekli 101 Okey skor ve turnuva uygulaması.
+        </Text>
+
+        <View style={styles.divider} />
+
+        <View style={styles.infoPanel}>
+          <InfoRow label="Sürüm" value={APP_INFO.version} />
+          <InfoRow label="Geliştirici" value={DEVELOPER_CREDIT} />
+          <InfoRow
+            label="Telif"
+            value={`© ${APP_INFO.copyrightYear}`}
+            last
+          />
         </View>
 
-        <Text style={styles.description}>{APP_INFO.shortDescription}</Text>
-      </ScrollView>
+        <View style={styles.footer}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onBack}
+            style={({ pressed }) => [
+              styles.primaryButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.primaryLabel}>Ana Sayfa</Text>
+          </Pressable>
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -50,52 +91,126 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: ui.green,
   },
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xxl,
-    gap: spacing.lg,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingBottom: 12,
   },
   backButton: {
-    alignSelf: 'flex-start',
-    minHeight: 44,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.sm,
-    borderRadius: radii.sm,
   },
-  backPressed: {
-    backgroundColor: colors.surface,
+  backSpacer: {
+    width: 40,
   },
   backLabel: {
-    ...typography.buttonSecondary,
-    color: colors.primary,
+    fontSize: 32,
+    fontWeight: '300',
+    color: ui.gold,
+    marginTop: -2,
   },
-  hero: {
-    gap: spacing.sm,
-    paddingVertical: spacing.lg,
+  titleBlock: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    color: ui.gold,
+  },
+  goldRule: {
+    width: 48,
+    height: 2,
+    backgroundColor: ui.gold,
+    borderRadius: 1,
+  },
+  sheet: {
+    flex: 1,
+    backgroundColor: ui.cream,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 12,
+    gap: 12,
   },
   brand: {
-    fontSize: 32,
-    fontWeight: '700',
-    lineHeight: 38,
-    color: colors.text,
-  },
-  version: {
-    ...typography.infoLabel,
-    color: colors.textSecondary,
-  },
-  credit: {
-    ...typography.body,
-    color: colors.text,
-  },
-  copyright: {
-    ...typography.infoLabel,
-    color: colors.textSecondary,
+    fontSize: 28,
+    fontWeight: '800',
+    color: ui.green,
+    textAlign: 'center',
   },
   description: {
-    ...typography.body,
-    color: colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 20,
+    color: ui.textMuted,
+    textAlign: 'center',
+    paddingHorizontal: 8,
+  },
+  divider: {
+    height: 1.5,
+    backgroundColor: ui.gold,
+    opacity: 0.75,
+    marginVertical: 4,
+  },
+  infoPanel: {
+    backgroundColor: ui.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: ui.gold,
+    overflow: 'hidden',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 44,
+    paddingHorizontal: 14,
+    gap: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: ui.line,
+  },
+  infoRowLast: {
+    borderBottomWidth: 0,
+  },
+  infoLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: ui.textMuted,
+  },
+  infoValue: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    color: ui.text,
+    textAlign: 'right',
+  },
+  footer: {
+    marginTop: 'auto',
+  },
+  primaryButton: {
+    minHeight: 52,
+    borderRadius: 10,
+    backgroundColor: ui.green,
+    borderWidth: 1,
+    borderColor: ui.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: ui.white,
+  },
+  pressed: {
+    opacity: 0.82,
   },
 });

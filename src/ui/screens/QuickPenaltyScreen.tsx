@@ -11,6 +11,7 @@ import {
 
 import { DEFAULT_SCORE_RULES } from '../../engine/rules';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { ScreenBackButton, SectionLabel } from '../components/ScreenChrome';
 import { resolveGameMode } from '../gameMode';
 import { playersFromActiveGame } from '../gameRoster';
 import { colors, radii, spacing, typography } from '../theme';
@@ -149,16 +150,7 @@ export function QuickPenaltyScreen({
       <View style={styles.shell}>
         <View style={styles.content}>
           <View style={styles.topRow}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={onBack}
-              style={({ pressed }) => [
-                styles.backButton,
-                pressed && styles.backPressed,
-              ]}
-            >
-              <Text style={styles.backLabel}>Geri</Text>
-            </Pressable>
+            <ScreenBackButton onPress={onBack} />
             <Text style={styles.title}>Ceza Ekle</Text>
           </View>
 
@@ -168,7 +160,7 @@ export function QuickPenaltyScreen({
               : 'Oyuncuyu ve ceza türünü seç.'}
           </Text>
 
-          <Text style={styles.sectionTitle}>Oyuncu</Text>
+          <SectionLabel>Oyuncu</SectionLabel>
           <View style={styles.grid}>
             {players.map((player) => (
               <GridChip
@@ -180,7 +172,7 @@ export function QuickPenaltyScreen({
             ))}
           </View>
 
-          <Text style={styles.sectionTitle}>Ceza türü</Text>
+          <SectionLabel>Ceza Türü</SectionLabel>
           <View style={styles.grid}>
             {PENALTY_OPTIONS.map((option) => (
               <GridChip
@@ -256,20 +248,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     minHeight: 44,
   },
-  backButton: {
-    minHeight: 44,
-    minWidth: 44,
-    paddingHorizontal: spacing.sm,
-    justifyContent: 'center',
-    borderRadius: radii.sm,
-  },
-  backPressed: {
-    backgroundColor: colors.surface,
-  },
-  backLabel: {
-    ...typography.buttonSecondary,
-    color: colors.primary,
-  },
   title: {
     fontSize: 22,
     fontWeight: '700',
@@ -279,12 +257,6 @@ const styles = StyleSheet.create({
     ...typography.infoLabel,
     color: colors.textSecondary,
   },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.primary,
-    marginTop: 2,
-  },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -293,18 +265,18 @@ const styles = StyleSheet.create({
   },
   gridChip: {
     width: '48.5%',
-    minHeight: 52,
+    minHeight: 48,
     borderRadius: radii.sm,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.sm,
   },
   gridChipSelected: {
     backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    borderColor: colors.gold,
   },
   gridChipPressed: {
     backgroundColor: colors.surface,
@@ -333,7 +305,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.sm,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: colors.white,
     paddingHorizontal: spacing.sm,
     color: colors.text,
     fontSize: 17,
@@ -341,10 +313,10 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     marginTop: 'auto',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceElevated,
     borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.goldMuted,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     minHeight: 44,

@@ -1,14 +1,15 @@
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { APP_INFO } from '../../config/appInfo';
+import { GoldRule } from '../components/ScreenChrome';
 import { colors, spacing, typography } from '../theme';
 
 export function AppLoadingScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.brand}>{APP_INFO.name.toUpperCase()}</Text>
-      <ActivityIndicator color={colors.primary} size="large" />
-      <Text style={styles.label}>Yükleniyor…</Text>
+      <GoldRule style={styles.rule} />
+      <ActivityIndicator color={colors.gold} size="large" />
     </View>
   );
 }
@@ -16,19 +17,18 @@ export function AppLoadingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.felt,
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.md,
     paddingHorizontal: spacing.lg,
   },
   brand: {
-    ...typography.brand,
-    color: colors.primaryMuted,
-    marginBottom: spacing.sm,
+    ...typography.brandHero,
+    color: colors.textOnDark,
+    textAlign: 'center',
   },
-  label: {
-    ...typography.infoLabel,
-    color: colors.textSecondary,
+  rule: {
+    width: 56,
   },
 });

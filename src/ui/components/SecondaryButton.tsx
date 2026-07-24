@@ -36,26 +36,21 @@ export function SecondaryButton({
 
 const styles = StyleSheet.create({
   button: {
-    flex: 1,
-    minHeight: 52,
+    flexGrow: 0,
+    minHeight: 48,
     borderRadius: radii.md,
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.gold,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   pressed: {
     backgroundColor: colors.surface,
   },
   disabled: {
-    opacity: 0.45,
+    opacity: 0.4,
   },
   label: {
     ...typography.buttonSecondary,

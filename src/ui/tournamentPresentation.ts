@@ -13,6 +13,14 @@ export type TournamentListCardModel = {
   subtitle: string;
   meta: string;
   lastPlayedAt: string | null;
+  leftLabel: string;
+  rightLabel: string | null;
+  scoreLeft: string;
+  scoreRight: string | null;
+  totalGames: number;
+  lastPlayedLabel: string;
+  playAgainLabel: string;
+  latestRecord: CompletedGameRecord | null;
 };
 
 export type TournamentGameRowModel = {
@@ -42,6 +50,9 @@ export function buildTournamentListCard(
   series: MatchupSeriesSummary,
 ): TournamentListCardModel {
   const modeLabel = gameModeShortLabel(series.gameMode);
+  const lastPlayedLabel = formatSafeDateTime(series.lastPlayedAt);
+  const latestRecord = series.games[0] ?? null;
+
   if (series.gameMode === 'paired' && series.paired) {
     const ties =
       series.paired.ties > 0 ? ` · ${series.paired.ties} beraberlik` : '';
@@ -51,12 +62,21 @@ export function buildTournamentListCard(
       modeLabel,
       title: `${series.paired.teamA.displayLabel}  vs  ${series.paired.teamB.displayLabel}`,
       subtitle: `Seri ${formatPairedSeriesScore(series.paired)}${ties}`,
-      meta: `${series.totalGames} oyun · ${formatSafeDateTime(series.lastPlayedAt)}`,
+      meta: `${series.totalGames} oyun · ${lastPlayedLabel}`,
       lastPlayedAt: series.lastPlayedAt,
+      leftLabel: series.paired.teamA.displayLabel,
+      rightLabel: series.paired.teamB.displayLabel,
+      scoreLeft: String(series.paired.winsA),
+      scoreRight: String(series.paired.winsB),
+      totalGames: series.totalGames,
+      lastPlayedLabel,
+      playAgainLabel: 'Bu Takımlarla Yeni Oyun',
+      latestRecord,
     };
   }
 
   const leader = series.individual?.[0];
+  const second = series.individual?.[1];
   const leaderLine = leader
     ? `${leader.name}: ${leader.wins} galibiyet`
     : 'Tekli turnuva';
@@ -70,8 +90,16 @@ export function buildTournamentListCard(
       .slice(0, 4)
       .join(' · '),
     subtitle: leaderLine,
-    meta: `${series.totalGames} oyun · ${formatSafeDateTime(series.lastPlayedAt)}`,
+    meta: `${series.totalGames} oyun · ${lastPlayedLabel}`,
     lastPlayedAt: series.lastPlayedAt,
+    leftLabel: leader?.name ?? 'Turnuva',
+    rightLabel: second?.name ?? null,
+    scoreLeft: String(leader?.wins ?? 0),
+    scoreRight: second ? String(second.wins) : null,
+    totalGames: series.totalGames,
+    lastPlayedLabel,
+    playAgainLabel: 'Bu Oyuncularla Yeni Oyun',
+    latestRecord,
   };
 }
 

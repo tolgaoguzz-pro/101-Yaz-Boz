@@ -4,17 +4,23 @@ import { colors, radii, spacing, typography } from '../theme';
 
 type AppTextFieldProps = TextInputProps & {
   label: string;
+  compact?: boolean;
 };
 
-export function AppTextField({ label, style, ...props }: AppTextFieldProps) {
+export function AppTextField({
+  label,
+  style,
+  compact = false,
+  ...props
+}: AppTextFieldProps) {
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, compact && styles.wrapCompact]}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
         selectTextOnFocus
         {...props}
         placeholderTextColor={colors.textSecondary}
-        style={[styles.input, style]}
+        style={[styles.input, compact && styles.inputCompact, style]}
       />
     </View>
   );
@@ -22,21 +28,28 @@ export function AppTextField({ label, style, ...props }: AppTextFieldProps) {
 
 const styles = StyleSheet.create({
   wrap: {
-    gap: spacing.xs,
+    gap: 4,
+  },
+  wrapCompact: {
+    gap: 2,
   },
   label: {
     ...typography.infoLabel,
     color: colors.textSecondary,
   },
   input: {
-    minHeight: 52,
-    borderRadius: radii.md,
+    minHeight: 44,
+    borderRadius: radii.sm,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surfaceElevated,
-    paddingHorizontal: spacing.md,
+    backgroundColor: colors.white,
+    paddingHorizontal: spacing.sm,
     color: colors.text,
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '500',
+  },
+  inputCompact: {
+    minHeight: 40,
+    fontSize: 15,
   },
 });

@@ -101,7 +101,7 @@ export function GameActionsSheet({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(20, 30, 26, 0.55)',
+    backgroundColor: 'rgba(10, 47, 35, 0.72)',
     justifyContent: 'flex-end',
   },
   safe: {
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
     borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.goldMuted,
     padding: spacing.md,
     gap: spacing.sm,
   },
@@ -129,14 +129,14 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
   },
   dangerAction: {
-    borderColor: '#D4A8A8',
-    backgroundColor: '#F7E8E6',
+    borderColor: colors.goldMuted,
+    backgroundColor: colors.surface,
   },
   actionPressed: {
     opacity: 0.88,
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   dangerLabel: {
-    color: '#8B2E2E',
+    color: colors.feltDeep,
   },
   cancel: {
     minHeight: 48,

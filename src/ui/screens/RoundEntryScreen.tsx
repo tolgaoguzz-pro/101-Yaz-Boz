@@ -6,18 +6,14 @@ import {
   Platform,
   Pressable,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
 } from 'react-native';
 
 import { CalculateRoundResult } from '../../engine/calculateRound';
 import { RoundSaveMeta } from '../applyGameUpdates';
-import { PrimaryButton } from '../components/PrimaryButton';
-import { SecondaryButton } from '../components/SecondaryButton';
 import { resolveGameMode } from '../gameMode';
 import { playersFromActiveGame } from '../gameRoster';
 import {
@@ -44,9 +40,22 @@ import {
   RoundEntryForm,
   RoundEntryPlayerForm,
 } from '../roundEntry/types';
-import { colors, radii, spacing, typography } from '../theme';
+import { resolveTargetRoundCount } from '../targetRoundCount';
 import { ActiveGameData } from './ActiveGameScreen';
 import { RoundPreviewScreen } from './RoundPreviewScreen';
+
+/** Referans Yeni El paleti. */
+const ui = {
+  green: '#1F5E3B',
+  greenDeep: '#174A2E',
+  cream: '#F7F2E8',
+  gold: '#C8A44D',
+  white: '#FFFFFF',
+  text: '#263238',
+  textMuted: '#7A847C',
+  line: '#D9D2C4',
+  border: '#C5BBA8',
+} as const;
 
 type RoundEntryScreenProps = {
   game: ActiveGameData;
@@ -54,21 +63,21 @@ type RoundEntryScreenProps = {
   onSaveRound: (result: CalculateRoundResult, meta: RoundSaveMeta) => void;
 };
 
-type ChoiceChipProps = {
+type ChipProps = {
   label: string;
   selected: boolean;
   disabled?: boolean;
   onPress: () => void;
-  fullWidth?: boolean;
+  compact?: boolean;
 };
 
-function ChoiceChip({
+function Chip({
   label,
   selected,
   disabled = false,
   onPress,
-  fullWidth = false,
-}: ChoiceChipProps) {
+  compact = false,
+}: ChipProps) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -76,7 +85,7 @@ function ChoiceChip({
       onPress={onPress}
       style={({ pressed }) => [
         styles.chip,
-        fullWidth && styles.chipFull,
+        compact && styles.chipCompact,
         selected && styles.chipSelected,
         disabled && styles.chipDisabled,
         pressed && !disabled && styles.chipPressed,
@@ -85,10 +94,11 @@ function ChoiceChip({
       <Text
         style={[
           styles.chipLabel,
+          compact && styles.chipLabelCompact,
           selected && styles.chipLabelSelected,
           disabled && styles.chipLabelDisabled,
         ]}
-        numberOfLines={2}
+        numberOfLines={1}
       >
         {label}
       </Text>
@@ -114,54 +124,69 @@ function PlayerEntryRow({
   onBlurTiles: () => void;
 }) {
   const opened = playerForm.openType !== 'didNotOpen';
+
   return (
     <View style={styles.entryRow}>
-      <Text style={styles.entryName} numberOfLines={1}>
+      <Text style={styles.colPlayer} numberOfLines={1}>
         {playerName}
       </Text>
-      <View style={styles.entryControls}>
+
+      <View style={styles.colDurum}>
         {mode.showOpenedChoice ? (
-          <View style={styles.miniRow}>
-            <ChoiceChip
+          <View style={styles.inlineChips}>
+            <Chip
+              compact
               label="Açtı"
               selected={opened}
               onPress={() => onSetOpened(true)}
             />
-            <ChoiceChip
+            <Chip
+              compact
               label="Açmadı"
               selected={!opened}
               onPress={() => onSetOpened(false)}
             />
           </View>
-        ) : null}
+        ) : (
+          <Text style={styles.cellDash}>—</Text>
+        )}
+      </View>
+
+      <View style={styles.colAcilis}>
         {mode.showSeriesDoubles ? (
-          <View style={styles.miniRow}>
-            <ChoiceChip
+          <View style={styles.inlineChips}>
+            <Chip
+              compact
               label="Seri"
               selected={playerForm.openType === 'series'}
               onPress={() => onSetOpenKind('series')}
             />
-            <ChoiceChip
+            <Chip
+              compact
               label="Çift"
               selected={playerForm.openType === 'doubles'}
               onPress={() => onSetOpenKind('doubles')}
             />
           </View>
-        ) : null}
+        ) : (
+          <Text style={styles.cellDash}>—</Text>
+        )}
+      </View>
+
+      <View style={styles.colKalan}>
         {mode.showRemainingTiles ? (
-          <View style={styles.tileRow}>
-            <Text style={styles.tileLabel}>Kalan</Text>
-            <TextInput
-              keyboardType="number-pad"
-              value={playerForm.remainingTilePointsText}
-              selectTextOnFocus
-              onChangeText={onChangeTiles}
-              onBlur={onBlurTiles}
-              placeholderTextColor={colors.textSecondary}
-              style={styles.tileInput}
-            />
-          </View>
-        ) : null}
+          <TextInput
+            keyboardType="number-pad"
+            value={playerForm.remainingTilePointsText}
+            selectTextOnFocus
+            onChangeText={onChangeTiles}
+            onBlur={onBlurTiles}
+            placeholderTextColor={ui.textMuted}
+            style={styles.tileInput}
+          />
+        ) : (
+          <Text style={styles.cellDash}>—</Text>
+        )}
       </View>
     </View>
   );
@@ -172,11 +197,10 @@ export function RoundEntryScreen({
   onBack,
   onSaveRound,
 }: RoundEntryScreenProps) {
-  const { height, width } = useWindowDimensions();
-  const compact = height < 740;
-  const dualColumn = width >= 360;
   const rosterPlayers = useMemo(() => playersFromActiveGame(game), [game]);
   const isIndividual = resolveGameMode(game.gameMode) === 'individual';
+  const targetRounds = resolveTargetRoundCount(game.targetRoundCount);
+  const currentRound = game.rounds.length + 1;
 
   const [form, setForm] = useState<RoundEntryForm>(() =>
     createInitialRoundEntryForm(rosterPlayers),
@@ -189,7 +213,7 @@ export function RoundEntryScreen({
 
   const finishOptionsDisabled = form.finisherPlayerId === null;
   const visiblePlayerIds = getVisiblePlayerIds(form);
-  const showPlayerCards = shouldShowPlayerEntryCards(form);
+  const showPlayerTable = shouldShowPlayerEntryCards(form);
   const showHandAutoNote =
     form.finisherPlayerId !== null && isHandStyleFinish(form.finishType);
 
@@ -321,239 +345,190 @@ export function RoundEntryScreen({
     return map;
   }, [rosterPlayers]);
 
-  function renderPlayerEntries(playerIds: string[]) {
-    return playerIds.map((playerId) => {
-      const playerForm = form.players.find((p) => p.playerId === playerId);
-      const playerName = nameByPlayerId.get(playerId);
-      if (!playerForm || !playerName) {
-        return null;
-      }
-      const mode = getPlayerCardMode(form, playerId);
-      return (
-        <PlayerEntryRow
-          key={playerId}
-          playerName={playerName}
-          playerForm={playerForm}
-          mode={mode}
-          onSetOpened={(opened) => setOpened(playerId, opened)}
-          onSetOpenKind={(kind) => setOpenKind(playerId, kind)}
-          onChangeTiles={(value) =>
-            updatePlayer(playerId, { remainingTilePointsText: value })
-          }
-          onBlurTiles={() =>
-            updatePlayer(playerId, {
-              remainingTilePointsText: String(
-                parseNonNegativeNumber(playerForm.remainingTilePointsText),
-              ),
-            })
-          }
-        />
-      );
-    });
-  }
-
-  const visibleTeam1 = visiblePlayerIds.filter((id) =>
-    team1Players.some((p) => p.id === id),
-  );
-  const visibleTeam2 = visiblePlayerIds.filter((id) =>
-    team2Players.some((p) => p.id === id),
-  );
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 4 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        <ScrollView
-          style={styles.flex}
-          contentContainerStyle={[
-            styles.content,
-            compact && styles.contentCompact,
-          ]}
-          keyboardShouldPersistTaps="always"
-          keyboardDismissMode="on-drag"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.topRow}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={onBack}
-              style={({ pressed }) => [
-                styles.backButton,
-                pressed && styles.backPressed,
-              ]}
-            >
-              <Text style={styles.backLabel}>Geri</Text>
-            </Pressable>
-            <View style={styles.titleBlock}>
-              <Text style={styles.title}>Yeni El</Text>
-              <Text style={styles.roundMeta}>
-                {game.rounds.length + 1} /{' '}
-                {game.targetRoundCount ?? 12}. El
+        <View style={styles.header}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onBack}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.backButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.backLabel}>‹</Text>
+          </Pressable>
+          <View style={styles.titleBlock}>
+            <Text style={styles.title}>Yeni El</Text>
+            <Text style={styles.roundMeta}>
+              {currentRound} / {targetRounds}. El
+            </Text>
+          </View>
+          <View style={styles.backSpacer} />
+        </View>
+
+        <View style={styles.body}>
+          <View style={styles.teamBlocks}>
+            <View style={styles.teamBlock}>
+              <Text style={styles.teamHeading} numberOfLines={1}>
+                {isIndividual ? 'Oyuncular' : game.teams[0].name}
               </Text>
+              {team1Players.map((player) => (
+                <Chip
+                  key={player.id}
+                  label={player.name}
+                  selected={form.finisherPlayerId === player.id}
+                  onPress={() => selectFinisher(player.id)}
+                />
+              ))}
+            </View>
+            <View style={styles.teamDivider} />
+            <View style={styles.teamBlock}>
+              <Text style={styles.teamHeading} numberOfLines={1}>
+                {isIndividual ? ' ' : game.teams[1].name}
+              </Text>
+              {team2Players.map((player) => (
+                <Chip
+                  key={player.id}
+                  label={player.name}
+                  selected={form.finisherPlayerId === player.id}
+                  onPress={() => selectFinisher(player.id)}
+                />
+              ))}
             </View>
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Bitiren Oyuncu</Text>
-            {isIndividual ? (
-              <View style={styles.grid2}>
-                {rosterPlayers.map((player) => (
-                  <ChoiceChip
-                    key={player.id}
-                    label={player.name}
-                    selected={form.finisherPlayerId === player.id}
-                    onPress={() => selectFinisher(player.id)}
-                    fullWidth
-                  />
-                ))}
-                <ChoiceChip
-                  label="Bitmedi"
-                  selected={form.finisherPlayerId === null}
-                  onPress={() => selectFinisher(null)}
-                  fullWidth
-                />
-              </View>
-            ) : (
-              <View style={styles.teamColumns}>
-                <View style={styles.teamCol}>
-                  <Text style={styles.teamHeading} numberOfLines={1}>
-                    {game.teams[0].name}
-                  </Text>
-                  {team1Players.map((player) => (
-                    <ChoiceChip
-                      key={player.id}
-                      label={player.name}
-                      selected={form.finisherPlayerId === player.id}
-                      onPress={() => selectFinisher(player.id)}
-                      fullWidth
-                    />
-                  ))}
-                </View>
-                <View style={styles.teamCol}>
-                  <Text style={styles.teamHeading} numberOfLines={1}>
-                    {game.teams[1].name}
-                  </Text>
-                  {team2Players.map((player) => (
-                    <ChoiceChip
-                      key={player.id}
-                      label={player.name}
-                      selected={form.finisherPlayerId === player.id}
-                      onPress={() => selectFinisher(player.id)}
-                      fullWidth
-                    />
-                  ))}
-                </View>
-              </View>
-            )}
-            {!isIndividual ? (
-              <ChoiceChip
-                label="Bitmedi"
-                selected={form.finisherPlayerId === null}
-                onPress={() => selectFinisher(null)}
-                fullWidth
-              />
-            ) : null}
-          </View>
+          <Chip
+            label="Bitmedi"
+            selected={form.finisherPlayerId === null}
+            onPress={() => selectFinisher(null)}
+          />
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Bitiş Türü</Text>
-            <View style={styles.finishGrid}>
-              {FINISH_OPTIONS.map((option) => {
-                const isNoneOption = option.value === 'none';
-                const disabled = finishOptionsDisabled
-                  ? !isNoneOption
-                  : isNoneOption;
-                return (
-                  <ChoiceChip
-                    key={option.value}
+          <Text style={styles.sectionTitle}>BİTİŞ TÜRÜ</Text>
+          <View style={styles.finishGrid}>
+            {FINISH_OPTIONS.map((option) => {
+              const isNoneOption = option.value === 'none';
+              const disabled = finishOptionsDisabled
+                ? !isNoneOption
+                : isNoneOption;
+              return (
+                <View key={option.value} style={styles.finishCell}>
+                  <Chip
                     label={option.label}
                     selected={form.finishType === option.value}
                     disabled={disabled}
                     onPress={() => selectFinishType(option.value)}
-                    fullWidth
+                  />
+                </View>
+              );
+            })}
+          </View>
+
+          {showHandAutoNote ? (
+            <View style={styles.handNote}>
+              <Text style={styles.handNoteText}>
+                Diğer oyuncular açmamış sayılır.
+              </Text>
+            </View>
+          ) : null}
+
+          {showPlayerTable ? (
+            <View style={styles.entryTable}>
+              <View style={styles.entryHeader}>
+                <Text style={[styles.colPlayer, styles.headerCell]}>
+                  Oyuncu
+                </Text>
+                <Text style={[styles.colDurum, styles.headerCell]}>Durum</Text>
+                <Text style={[styles.colAcilis, styles.headerCell]}>
+                  Açılış
+                </Text>
+                <Text style={[styles.colKalan, styles.headerCell]}>Kalan</Text>
+              </View>
+              {visiblePlayerIds.map((playerId) => {
+                const playerForm = form.players.find(
+                  (p) => p.playerId === playerId,
+                );
+                const playerName = nameByPlayerId.get(playerId);
+                if (!playerForm || !playerName) {
+                  return null;
+                }
+                const mode = getPlayerCardMode(form, playerId);
+                return (
+                  <PlayerEntryRow
+                    key={playerId}
+                    playerName={playerName}
+                    playerForm={playerForm}
+                    mode={mode}
+                    onSetOpened={(opened) => setOpened(playerId, opened)}
+                    onSetOpenKind={(kind) => setOpenKind(playerId, kind)}
+                    onChangeTiles={(value) =>
+                      updatePlayer(playerId, {
+                        remainingTilePointsText: value,
+                      })
+                    }
+                    onBlurTiles={() =>
+                      updatePlayer(playerId, {
+                        remainingTilePointsText: String(
+                          parseNonNegativeNumber(
+                            playerForm.remainingTilePointsText,
+                          ),
+                        ),
+                      })
+                    }
                   />
                 );
               })}
             </View>
-          </View>
-
-          {showHandAutoNote ? (
-            <Text style={styles.infoText}>
-              Diğer üç oyuncu açmamış sayılacak.
-            </Text>
-          ) : null}
-
-          {showPlayerCards ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Oyuncu Girişleri</Text>
-              {isIndividual ? (
-                <View style={styles.entryBlock}>
-                  {renderPlayerEntries(visiblePlayerIds)}
-                </View>
-              ) : dualColumn ? (
-                <View style={styles.teamColumns}>
-                  <View style={styles.entryBlock}>
-                    <Text style={styles.teamHeading} numberOfLines={1}>
-                      {game.teams[0].name}
-                    </Text>
-                    {renderPlayerEntries(visibleTeam1)}
-                  </View>
-                  <View style={styles.entryBlock}>
-                    <Text style={styles.teamHeading} numberOfLines={1}>
-                      {game.teams[1].name}
-                    </Text>
-                    {renderPlayerEntries(visibleTeam2)}
-                  </View>
-                </View>
-              ) : (
-                <>
-                  <View style={styles.entryBlock}>
-                    <Text style={styles.teamHeading} numberOfLines={1}>
-                      {game.teams[0].name}
-                    </Text>
-                    {renderPlayerEntries(visibleTeam1)}
-                  </View>
-                  <View style={styles.entryBlock}>
-                    <Text style={styles.teamHeading} numberOfLines={1}>
-                      {game.teams[1].name}
-                    </Text>
-                    {renderPlayerEntries(visibleTeam2)}
-                  </View>
-                </>
-              )}
-            </View>
           ) : null}
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
+        </View>
 
-          <View style={styles.footer}>
-            <PrimaryButton
-              label="Eli Kaydet"
-              onPress={handleDirectSave}
-              disabled={saving}
-            />
-            <SecondaryButton
-              label="Önizle"
+        <View style={styles.footer}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={handleDirectSave}
+            disabled={saving}
+            style={({ pressed }) => [
+              styles.primaryButton,
+              pressed && !saving && styles.pressed,
+              saving && styles.disabled,
+            ]}
+          >
+            <Text style={styles.primaryLabel}>Eli Kaydet</Text>
+          </Pressable>
+          <View style={styles.footerSecondary}>
+            <Pressable
+              accessibilityRole="button"
               onPress={handlePreview}
               disabled={saving}
-              style={styles.fullButton}
-            />
+              style={({ pressed }) => [
+                styles.secondaryButton,
+                pressed && !saving && styles.pressed,
+                saving && styles.disabled,
+              ]}
+            >
+              <Text style={styles.secondaryLabel}>Önizle</Text>
+            </Pressable>
             <Pressable
               accessibilityRole="button"
               onPress={onBack}
               disabled={saving}
               style={({ pressed }) => [
                 styles.cancelButton,
-                pressed && styles.cancelPressed,
+                pressed && !saving && styles.pressed,
               ]}
             >
               <Text style={styles.cancelLabel}>İptal</Text>
             </Pressable>
           </View>
-        </ScrollView>
+        </View>
       </KeyboardAvoidingView>
 
       <Modal
@@ -580,204 +555,280 @@ export function RoundEntryScreen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: ui.green,
   },
   flex: {
     flex: 1,
   },
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.xs,
-    paddingBottom: spacing.md,
-    gap: spacing.sm,
-  },
-  contentCompact: {
-    gap: 6,
-  },
-  topRow: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+    backgroundColor: ui.green,
   },
   backButton: {
-    minHeight: 40,
-    minWidth: 44,
-    paddingHorizontal: spacing.sm,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radii.sm,
   },
-  backPressed: {
-    backgroundColor: colors.surface,
+  backSpacer: {
+    width: 40,
   },
   backLabel: {
-    ...typography.buttonSecondary,
-    color: colors.primary,
+    fontSize: 32,
+    fontWeight: '300',
+    color: ui.white,
+    marginTop: -2,
   },
   titleBlock: {
     flex: 1,
+    alignItems: 'center',
   },
   title: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '700',
-    color: colors.text,
+    color: ui.white,
   },
   roundMeta: {
     fontSize: 12,
-    fontWeight: '600',
-    color: colors.textSecondary,
+    fontWeight: '500',
+    color: 'rgba(247, 242, 232, 0.78)',
   },
-  section: {
-    gap: 6,
+  body: {
+    flex: 1,
+    backgroundColor: ui.cream,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    gap: 8,
   },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  teamColumns: {
+  teamBlocks: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: 10,
   },
-  teamCol: {
+  teamBlock: {
     flex: 1,
     gap: 6,
   },
+  teamDivider: {
+    width: 1.5,
+    backgroundColor: ui.gold,
+    alignSelf: 'stretch',
+    opacity: 0.85,
+  },
   teamHeading: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.primaryMuted,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    color: ui.green,
     marginBottom: 2,
   },
-  grid2: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    color: ui.green,
+    marginTop: 2,
   },
   finishGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
   },
+  finishCell: {
+    width: '31.5%',
+    flexGrow: 1,
+  },
   chip: {
-    minHeight: 44,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radii.sm,
+    minHeight: 36,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceElevated,
+    borderColor: ui.green,
+    backgroundColor: ui.white,
     alignItems: 'center',
     justifyContent: 'center',
-    flexGrow: 1,
-    flexBasis: '46%',
+    paddingHorizontal: 8,
   },
-  chipFull: {
-    flexBasis: '100%',
+  chipCompact: {
+    minHeight: 28,
+    paddingHorizontal: 6,
+    flex: 1,
   },
   chipSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: ui.green,
+    borderColor: ui.gold,
   },
   chipDisabled: {
-    opacity: 0.4,
+    opacity: 0.35,
   },
   chipPressed: {
-    backgroundColor: colors.surface,
+    opacity: 0.82,
   },
   chipLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: colors.primary,
+    color: ui.green,
     textAlign: 'center',
+  },
+  chipLabelCompact: {
+    fontSize: 11,
   },
   chipLabelSelected: {
-    color: colors.textOnPrimary,
+    color: ui.white,
   },
   chipLabelDisabled: {
-    color: colors.textSecondary,
+    color: ui.textMuted,
   },
-  infoText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  entryBlock: {
+  handNote: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.sm,
-    backgroundColor: colors.surfaceElevated,
-    padding: spacing.xs,
-    gap: 6,
-  },
-  entryRow: {
-    gap: 4,
-    paddingBottom: 6,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  entryName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  entryControls: {
-    gap: 4,
-  },
-  miniRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-  },
-  tileRow: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
   },
-  tileLabel: {
-    fontSize: 12,
+  handNoteText: {
+    fontSize: 14,
     fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  tileInput: {
-    width: 64,
-    minHeight: 36,
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 6,
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '700',
+    color: ui.textMuted,
     textAlign: 'center',
   },
+  entryTable: {
+    flexGrow: 0,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: ui.line,
+  },
+  entryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 28,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: ui.line,
+  },
+  entryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 40,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: ui.line,
+    gap: 4,
+  },
+  headerCell: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: ui.green,
+  },
+  colPlayer: {
+    width: 68,
+    fontSize: 13,
+    fontWeight: '700',
+    color: ui.text,
+  },
+  colDurum: {
+    flex: 1.35,
+  },
+  colAcilis: {
+    flex: 1.15,
+  },
+  colKalan: {
+    width: 52,
+    alignItems: 'center',
+  },
+  inlineChips: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  cellDash: {
+    fontSize: 12,
+    color: ui.textMuted,
+    textAlign: 'center',
+  },
+  tileInput: {
+    width: 48,
+    minHeight: 30,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: ui.border,
+    backgroundColor: ui.white,
+    color: ui.text,
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    paddingHorizontal: 2,
+    paddingVertical: 0,
+  },
   error: {
-    ...typography.body,
-    color: '#8B2E2E',
-    backgroundColor: '#F3D9D4',
-    borderRadius: radii.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    fontSize: 12,
+    fontWeight: '600',
+    color: ui.greenDeep,
+    backgroundColor: ui.white,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: ui.gold,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   footer: {
-    marginTop: spacing.sm,
-    gap: spacing.xs,
+    backgroundColor: ui.cream,
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 10,
+    gap: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: ui.line,
   },
-  fullButton: {
-    flexGrow: 0,
-    width: '100%',
-  },
-  cancelButton: {
-    minHeight: 44,
+  primaryButton: {
+    minHeight: 48,
+    borderRadius: 10,
+    backgroundColor: ui.green,
+    borderWidth: 1,
+    borderColor: ui.gold,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cancelPressed: {
-    backgroundColor: colors.surface,
+  primaryLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: ui.white,
+  },
+  footerSecondary: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  secondaryButton: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 10,
+    backgroundColor: ui.white,
+    borderWidth: 1,
+    borderColor: ui.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: ui.green,
+  },
+  cancelButton: {
+    minWidth: 88,
+    minHeight: 44,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
   },
   cancelLabel: {
-    ...typography.buttonSecondary,
-    color: colors.textSecondary,
+    fontSize: 15,
+    fontWeight: '600',
+    color: ui.textMuted,
+  },
+  pressed: {
+    opacity: 0.82,
+  },
+  disabled: {
+    opacity: 0.45,
   },
 });

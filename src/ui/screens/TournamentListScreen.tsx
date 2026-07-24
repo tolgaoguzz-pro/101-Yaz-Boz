@@ -1,32 +1,100 @@
 import {
+  FlatList,
   Pressable,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { useEffect, useState } from 'react';
 
+import { CompletedGameRecord } from '../../domain/completedGame';
 import { buildAllMatchupSeries } from '../../domain/tournament';
 import { listCompletedGames } from '../../persistence/completedGameRepository';
-import { PrimaryButton } from '../components/PrimaryButton';
 import {
   buildTournamentListCard,
   TournamentListCardModel,
 } from '../tournamentPresentation';
-import { colors, radii, spacing, typography } from '../theme';
+
+/** Referans Turnuvalar paleti. */
+const ui = {
+  green: '#1F5E3B',
+  greenDeep: '#174A2E',
+  cream: '#F7F2E8',
+  gold: '#C8A44D',
+  white: '#FFFFFF',
+  text: '#263238',
+  textMuted: '#7A847C',
+  line: '#D9D2C4',
+} as const;
 
 type TournamentListScreenProps = {
   onBack: () => void;
   onOpenMatchup: (matchupKey: string) => void;
   onStartNewGame: () => void;
+  onPlayAgain: (record: CompletedGameRecord) => void;
 };
+
+function TournamentCard({
+  item,
+  onOpen,
+  onPlayAgain,
+}: {
+  item: TournamentListCardModel;
+  onOpen: () => void;
+  onPlayAgain: () => void;
+}) {
+  return (
+    <View style={styles.card}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onOpen}
+        style={({ pressed }) => [styles.cardMain, pressed && styles.pressed]}
+      >
+        <View style={styles.scoreRow}>
+          <Text style={styles.teamLabel} numberOfLines={2}>
+            {item.leftLabel}
+          </Text>
+          <Text style={styles.scoreValue}>{item.scoreLeft}</Text>
+          <Text style={styles.scoreDash}>—</Text>
+          <Text style={styles.scoreValue}>{item.scoreRight ?? '·'}</Text>
+          <Text style={styles.teamLabel} numberOfLines={2}>
+            {item.rightLabel ?? ''}
+          </Text>
+          <Text style={styles.chevron}>▶</Text>
+        </View>
+
+        <View style={styles.metaBlock}>
+          <Text style={styles.metaLine}>• Toplam maç: {item.totalGames}</Text>
+          {item.lastPlayedLabel ? (
+            <Text style={styles.metaLine}>
+              • Son oynanma: {item.lastPlayedLabel}
+            </Text>
+          ) : null}
+        </View>
+      </Pressable>
+
+      <View style={styles.cardRule} />
+
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPlayAgain}
+        style={({ pressed }) => [
+          styles.playAgainButton,
+          pressed && styles.pressed,
+        ]}
+      >
+        <Text style={styles.playAgainLabel}>{item.playAgainLabel}</Text>
+      </Pressable>
+    </View>
+  );
+}
 
 export function TournamentListScreen({
   onBack,
   onOpenMatchup,
   onStartNewGame,
+  onPlayAgain,
 }: TournamentListScreenProps) {
   const [cards, setCards] = useState<TournamentListCardModel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,55 +127,57 @@ export function TournamentListScreen({
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={styles.header}>
         <Pressable
           accessibilityRole="button"
           onPress={onBack}
-          style={({ pressed }) => [
-            styles.backButton,
-            pressed && styles.backPressed,
-          ]}
+          hitSlop={8}
+          style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
         >
-          <Text style={styles.backLabel}>Geri</Text>
+          <Text style={styles.backLabel}>‹</Text>
         </Pressable>
+        <View style={styles.titleBlock}>
+          <Text style={styles.trophy}>🏆</Text>
+          <Text style={styles.title}>Turnuvalar</Text>
+          <View style={styles.goldRule} />
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onStartNewGame}
+          hitSlop={8}
+          style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
+        >
+          <Text style={styles.plusLabel}>＋</Text>
+        </Pressable>
+      </View>
 
-        <Text style={styles.title}>Turnuvalar ve Geçmiş</Text>
-        <Text style={styles.subtitle}>
-          Aynı oyuncularla oynanan tamamlanmış oyunlar burada gruplanır.
-        </Text>
-
+      <View style={styles.sheet}>
         {loading ? (
           <Text style={styles.empty}>Yükleniyor…</Text>
         ) : cards.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.empty}>Henüz tamamlanmış oyun yok</Text>
-            <Text style={styles.emptyHint}>
-              Bir oyunu bitirdiğinde turnuva geçmişi burada görünür.
-            </Text>
-            <PrimaryButton label="Yeni Oyun Başlat" onPress={onStartNewGame} />
+          <View style={styles.emptyBlock}>
+            <Text style={styles.empty}>Henüz tamamlanmış turnuva yok.</Text>
           </View>
         ) : (
-          cards.map((card) => (
-            <Pressable
-              key={card.matchupKey}
-              accessibilityRole="button"
-              onPress={() => onOpenMatchup(card.matchupKey)}
-              style={({ pressed }) => [
-                styles.card,
-                pressed && styles.cardPressed,
-              ]}
-            >
-              <Text style={styles.mode}>{card.modeLabel}</Text>
-              <Text style={styles.cardTitle}>{card.title}</Text>
-              <Text style={styles.cardSubtitle}>{card.subtitle}</Text>
-              <Text style={styles.cardMeta}>{card.meta}</Text>
-            </Pressable>
-          ))
+          <FlatList
+            data={cards}
+            keyExtractor={(item) => item.matchupKey}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.list}
+            renderItem={({ item }) => (
+              <TournamentCard
+                item={item}
+                onOpen={() => onOpenMatchup(item.matchupKey)}
+                onPlayAgain={() => {
+                  if (item.latestRecord) {
+                    onPlayAgain(item.latestRecord);
+                  }
+                }}
+              />
+            )}
+          />
         )}
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -115,85 +185,144 @@ export function TournamentListScreen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: ui.green,
   },
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xxl,
-    gap: spacing.md,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingBottom: 14,
+    backgroundColor: ui.green,
   },
-  backButton: {
-    alignSelf: 'flex-start',
-    minHeight: 44,
+  iconButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.sm,
-    borderRadius: radii.sm,
-  },
-  backPressed: {
-    backgroundColor: colors.surface,
   },
   backLabel: {
-    ...typography.buttonSecondary,
-    color: colors.primary,
+    fontSize: 32,
+    fontWeight: '300',
+    color: ui.white,
+    marginTop: -2,
+  },
+  plusLabel: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: ui.gold,
+  },
+  titleBlock: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  trophy: {
+    fontSize: 28,
+    lineHeight: 32,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    lineHeight: 34,
-    color: colors.text,
+    fontSize: 20,
+    fontWeight: '800',
+    color: ui.gold,
+    letterSpacing: 0.6,
   },
-  subtitle: {
-    ...typography.body,
-    color: colors.textSecondary,
+  goldRule: {
+    width: 48,
+    height: 2,
+    backgroundColor: ui.gold,
+    borderRadius: 1,
   },
-  emptyCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    gap: spacing.md,
+  sheet: {
+    flex: 1,
+    backgroundColor: ui.cream,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingTop: 16,
+    paddingHorizontal: 14,
   },
-  empty: {
-    ...typography.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  emptyHint: {
-    ...typography.infoLabel,
-    color: colors.textSecondary,
-    textAlign: 'center',
+  list: {
+    gap: 12,
+    paddingBottom: 24,
   },
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
+    backgroundColor: ui.white,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    gap: spacing.xs,
+    borderColor: ui.gold,
+    overflow: 'hidden',
   },
-  cardPressed: {
-    opacity: 0.9,
+  cardMain: {
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 10,
+    gap: 10,
   },
-  mode: {
-    ...typography.infoLabel,
-    color: colors.primary,
+  scoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  cardTitle: {
-    ...typography.buttonSecondary,
-    color: colors.text,
+  teamLabel: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    color: ui.text,
+    textAlign: 'center',
   },
-  cardSubtitle: {
+  scoreValue: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: ui.green,
+    minWidth: 28,
+    textAlign: 'center',
+  },
+  scoreDash: {
     fontSize: 18,
     fontWeight: '700',
-    lineHeight: 24,
-    color: colors.primaryMuted,
+    color: ui.gold,
   },
-  cardMeta: {
-    fontSize: 13,
+  chevron: {
+    fontSize: 14,
+    color: ui.gold,
+    marginLeft: 2,
+  },
+  metaBlock: {
+    gap: 2,
+  },
+  metaLine: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: ui.textMuted,
+  },
+  cardRule: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: ui.line,
+    marginHorizontal: 14,
+  },
+  playAgainButton: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  playAgainLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: ui.green,
+  },
+  emptyBlock: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  empty: {
+    fontSize: 15,
     fontWeight: '600',
-    lineHeight: 18,
-    color: colors.textSecondary,
+    color: ui.textMuted,
+    textAlign: 'center',
+  },
+  pressed: {
+    opacity: 0.82,
   },
 });

@@ -43,6 +43,7 @@ import {
   QuickPenaltySelection,
 } from './src/ui/screens/QuickPenaltyScreen';
 import { RoundEntryScreen } from './src/ui/screens/RoundEntryScreen';
+import { StatsScreen } from './src/ui/screens/StatsScreen';
 import { TournamentDetailScreen } from './src/ui/screens/TournamentDetailScreen';
 import { TournamentListScreen } from './src/ui/screens/TournamentListScreen';
 
@@ -56,6 +57,7 @@ type Screen =
   | 'tournamentList'
   | 'tournamentDetail'
   | 'completedGameDetail'
+  | 'stats'
   | 'about';
 
 export default function App() {
@@ -124,7 +126,7 @@ export default function App() {
     return (
       <>
         <AppLoadingScreen />
-        <StatusBar style="dark" />
+        <StatusBar style="light" />
       </>
     );
   }
@@ -173,10 +175,10 @@ export default function App() {
     setScreen('activeGame');
   }
 
-  function handleNewTeams() {
+  function handleHomeFromResult() {
     commitActiveGame(null);
     setSeriesSummaryLine(null);
-    setScreen('newGame');
+    setScreen('home');
   }
 
   function handleNewGameFromHome() {
@@ -256,6 +258,7 @@ export default function App() {
           onRestart={handleRestartFromHome}
           onAbandon={handleAbandonFromHome}
           onTournaments={() => setScreen('tournamentList')}
+          onStats={() => setScreen('stats')}
           onAbout={() => setScreen('about')}
         />
       ) : null}
@@ -296,7 +299,7 @@ export default function App() {
           seriesSummaryLine={seriesSummaryLine}
           onRematch={handleRematch}
           onViewTournament={handleViewTournamentFromResult}
-          onNewTeams={handleNewTeams}
+          onHome={handleHomeFromResult}
         />
       ) : null}
       {screen === 'tournamentList' ? (
@@ -310,6 +313,7 @@ export default function App() {
             commitActiveGame(null);
             setScreen('newGame');
           }}
+          onPlayAgain={handlePlayAgainFromHistory}
         />
       ) : null}
       {screen === 'tournamentDetail' && selectedMatchupKey ? (
@@ -330,10 +334,22 @@ export default function App() {
           onPlayAgain={handlePlayAgainFromHistory}
         />
       ) : null}
+      {screen === 'stats' ? (
+        <StatsScreen onBack={() => setScreen('home')} />
+      ) : null}
       {screen === 'about' ? (
         <AboutScreen onBack={() => setScreen('home')} />
       ) : null}
-      <StatusBar style="dark" />
+      <StatusBar
+        style={
+          screen === 'home' ||
+          screen === 'about' ||
+          screen === 'activeGame' ||
+          screen === 'gameResult'
+            ? 'light'
+            : 'dark'
+        }
+      />
     </>
   );
 }

@@ -1,24 +1,36 @@
 import {
+  FlatList,
   Pressable,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-import { calculateMatchupSeries, MatchupSeriesSummary } from '../../domain/tournament';
 import { CompletedGameRecord } from '../../domain/completedGame';
+import {
+  calculateMatchupSeries,
+  MatchupSeriesSummary,
+} from '../../domain/tournament';
 import { listCompletedGamesByMatchup } from '../../persistence/completedGameRepository';
-import { PrimaryButton } from '../components/PrimaryButton';
 import { resolveGameMode } from '../gameMode';
 import {
   buildTournamentGameRow,
-  formatSafeDateTime,
   TournamentGameRowModel,
 } from '../tournamentPresentation';
-import { colors, radii, spacing, typography } from '../theme';
+
+/** Referans Turnuva Detay paleti. */
+const ui = {
+  green: '#1F5E3B',
+  greenDeep: '#174A2E',
+  cream: '#F7F2E8',
+  gold: '#C8A44D',
+  white: '#FFFFFF',
+  text: '#263238',
+  textMuted: '#7A847C',
+  line: 'rgba(200, 164, 77, 0.35)',
+} as const;
 
 type TournamentDetailScreenProps = {
   matchupKey: string;
@@ -26,6 +38,33 @@ type TournamentDetailScreenProps = {
   onOpenGame: (gameId: string) => void;
   onPlayAgain: (record: CompletedGameRecord) => void;
 };
+
+function averagePenaltyLabel(series: MatchupSeriesSummary): string {
+  if (series.individual && series.individual.length > 0) {
+    const sum = series.individual.reduce(
+      (total, player) => total + player.averagePenalty,
+      0,
+    );
+    return String(Math.round(sum / series.individual.length));
+  }
+
+  let sum = 0;
+  let count = 0;
+  for (const game of series.games) {
+    for (const player of game.finalPlayerScores) {
+      sum += player.totalScore;
+      count += 1;
+    }
+  }
+  return count > 0 ? String(Math.round(sum / count)) : '—';
+}
+
+function winnerLabel(outcomeLine: string): string {
+  if (outcomeLine.startsWith('Kazanan: ')) {
+    return outcomeLine.slice('Kazanan: '.length);
+  }
+  return outcomeLine;
+}
 
 export function TournamentDetailScreen({
   matchupKey,
@@ -49,8 +88,8 @@ export function TournamentDetailScreen({
         const summary = calculateMatchupSeries(games);
         if (!cancelled) {
           setSeries(summary);
-          setLatestRecord(games[0] ?? null);
-          setRows(games.map(buildTournamentGameRow));
+          setLatestRecord(summary?.games[0] ?? null);
+          setRows((summary?.games ?? []).map(buildTournamentGameRow));
         }
       } catch (error) {
         console.warn('[ui] TournamentDetailScreen load failed', error);
@@ -70,108 +109,139 @@ export function TournamentDetailScreen({
     };
   }, [matchupKey]);
 
-  const playAgainLabel =
-    series && resolveGameMode(series.gameMode) === 'individual'
-      ? 'Bu Oyuncularla Yeni Oyun'
-      : 'Bu Takımlarla Yeni Oyun';
+  const isIndividual =
+    series != null && resolveGameMode(series.gameMode) === 'individual';
+  const playAgainLabel = isIndividual
+    ? 'Bu Oyuncularla Yeni Oyun'
+    : 'Bu Takımlarla Yeni Oyun';
+
+  const tiesCount = useMemo(() => {
+    if (!series) {
+      return 0;
+    }
+    if (series.paired) {
+      return series.paired.ties;
+    }
+    return series.individualTieGames;
+  }, [series]);
+
+  const avgPenalty = series ? averagePenaltyLabel(series) : '—';
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={styles.header}>
         <Pressable
           accessibilityRole="button"
           onPress={onBack}
-          style={({ pressed }) => [
-            styles.backButton,
-            pressed && styles.backPressed,
-          ]}
+          hitSlop={8}
+          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
         >
-          <Text style={styles.backLabel}>Geri</Text>
+          <Text style={styles.backLabel}>‹</Text>
         </Pressable>
+        <Text style={styles.headerTitle}>Turnuva Detayı</Text>
+        <View style={styles.backSpacer} />
+      </View>
 
-        <Text style={styles.title}>Turnuva Detayı</Text>
-
-        {loading ? (
+      {loading ? (
+        <View style={styles.sheet}>
           <Text style={styles.empty}>Yükleniyor…</Text>
-        ) : !series ? (
+        </View>
+      ) : !series ? (
+        <View style={styles.sheet}>
           <Text style={styles.empty}>Bu eşleşme için oyun bulunamadı.</Text>
-        ) : (
-          <>
-            <View style={styles.headerCard}>
-              {series.gameMode === 'paired' && series.paired ? (
-                <>
-                  <Text style={styles.teamLine}>
-                    {series.paired.teamA.displayLabel}
-                  </Text>
-                  <Text style={styles.scoreLine}>
-                    {series.paired.winsA} - {series.paired.winsB}
-                  </Text>
-                  <Text style={styles.teamLine}>
-                    {series.paired.teamB.displayLabel}
-                  </Text>
-                  <Text style={styles.meta}>
-                    {series.totalGames} maç
-                    {series.paired.ties > 0
-                      ? ` · ${series.paired.ties} beraberlik`
-                      : ''}
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.sectionLabel}>Galibiyet sıralaması</Text>
-                  {(series.individual ?? []).map((player) => (
-                    <Text key={player.nameKey} style={styles.standingLine}>
-                      {player.name} — {player.wins} galibiyet
-                      {player.sharedWins > 0
-                        ? ` · ${player.sharedWins} berabere`
-                        : ''}
-                      {` · ort. ${Math.round(player.averagePenalty)}`}
-                    </Text>
-                  ))}
-                  <Text style={styles.meta}>
-                    {series.totalGames} maç
-                    {series.individualTieGames > 0
-                      ? ` · ${series.individualTieGames} beraberlik`
-                      : ''}
-                  </Text>
-                </>
-              )}
-              {series.lastPlayedAt ? (
-                <Text style={styles.meta}>
-                  Son oyun: {formatSafeDateTime(series.lastPlayedAt)}
+        </View>
+      ) : (
+        <>
+          <View style={styles.hero}>
+            {series.paired ? (
+              <View style={styles.seriesRow}>
+                <Text style={styles.teamName} numberOfLines={2}>
+                  {series.paired.teamA.displayLabel}
                 </Text>
-              ) : null}
+                <Text style={styles.seriesScore}>{series.paired.winsA}</Text>
+                <Text style={styles.seriesDash}>—</Text>
+                <Text style={styles.seriesScore}>{series.paired.winsB}</Text>
+                <Text style={styles.teamName} numberOfLines={2}>
+                  {series.paired.teamB.displayLabel}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.seriesRow}>
+                <Text style={styles.teamName} numberOfLines={2}>
+                  {series.individual?.[0]?.name ?? '—'}
+                </Text>
+                <Text style={styles.seriesScore}>
+                  {series.individual?.[0]?.wins ?? 0}
+                </Text>
+                <Text style={styles.seriesDash}>—</Text>
+                <Text style={styles.seriesScore}>
+                  {series.individual?.[1]?.wins ?? 0}
+                </Text>
+                <Text style={styles.teamName} numberOfLines={2}>
+                  {series.individual?.[1]?.name ?? '—'}
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.goldRule} />
+
+            <View style={styles.infoRow}>
+              <Text style={styles.infoItem}>
+                • Toplam Maç: {series.totalGames}
+              </Text>
+              <Text style={styles.infoItem}>• Beraberlik: {tiesCount}</Text>
+              <Text style={styles.infoItem}>
+                • Ortalama Ceza: {avgPenalty}
+              </Text>
             </View>
+          </View>
 
-            {latestRecord ? (
-              <PrimaryButton
-                label={playAgainLabel}
-                onPress={() => onPlayAgain(latestRecord)}
-              />
-            ) : null}
-
-            <Text style={styles.sectionHeading}>Geçmiş Oyunlar</Text>
-            {rows.map((row) => (
-              <View key={row.id} style={styles.gameCard}>
-                <Text style={styles.gameDate}>{row.completedAt}</Text>
-                <Text style={styles.gameScore}>{row.scoreLine}</Text>
-                <Text style={styles.gameOutcome}>{row.outcomeLine}</Text>
-                <Text style={styles.gameMeta}>{row.roundsLine}</Text>
+          <View style={styles.sheet}>
+            <Text style={styles.listTitle}>Geçmiş Maçlar</Text>
+            <FlatList
+              data={rows}
+              keyExtractor={(item) => item.id}
+              showsVerticalScrollIndicator={false}
+              style={styles.list}
+              contentContainerStyle={styles.listContent}
+              renderItem={({ item }) => (
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => onOpenGame(row.id)}
-                  style={styles.detailLink}
+                  onPress={() => onOpenGame(item.id)}
+                  style={({ pressed }) => [
+                    styles.gameRow,
+                    pressed && styles.pressed,
+                  ]}
                 >
-                  <Text style={styles.detailLinkLabel}>Detayı Gör</Text>
+                  <View style={styles.gameText}>
+                    <Text style={styles.gameDate}>{item.completedAt}</Text>
+                    <Text style={styles.gameScore} numberOfLines={1}>
+                      {item.scoreLine}
+                    </Text>
+                    <Text style={styles.gameWinner} numberOfLines={1}>
+                      {winnerLabel(item.outcomeLine)}
+                    </Text>
+                  </View>
+                  <Text style={styles.detailLink}>▶ Detayı Gör</Text>
                 </Pressable>
-              </View>
-            ))}
-          </>
-        )}
-      </ScrollView>
+              )}
+            />
+
+            {latestRecord ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => onPlayAgain(latestRecord)}
+                style={({ pressed }) => [
+                  styles.primaryButton,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.primaryLabel}>{playAgainLabel}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </>
+      )}
     </SafeAreaView>
   );
 }
@@ -179,110 +249,162 @@ export function TournamentDetailScreen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: ui.green,
   },
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xxl,
-    gap: spacing.md,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    minHeight: 44,
   },
   backButton: {
-    alignSelf: 'flex-start',
-    minHeight: 44,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.sm,
-    borderRadius: radii.sm,
   },
-  backPressed: {
-    backgroundColor: colors.surface,
+  backSpacer: {
+    width: 40,
   },
   backLabel: {
-    ...typography.buttonSecondary,
-    color: colors.primary,
+    fontSize: 32,
+    fontWeight: '300',
+    color: ui.white,
+    marginTop: -2,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    lineHeight: 34,
-    color: colors.text,
-  },
-  headerCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    gap: spacing.xs,
-  },
-  teamLine: {
-    ...typography.buttonSecondary,
-    color: colors.text,
-  },
-  scoreLine: {
-    fontSize: 36,
-    fontWeight: '700',
-    lineHeight: 42,
-    color: colors.primary,
+  headerTitle: {
+    flex: 1,
     textAlign: 'center',
-    marginVertical: spacing.xs,
+    fontSize: 17,
+    fontWeight: '700',
+    color: ui.white,
   },
-  sectionLabel: {
-    ...typography.infoLabel,
-    color: colors.primary,
+  hero: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 14,
+    gap: 10,
   },
-  standingLine: {
-    ...typography.body,
-    color: colors.text,
+  seriesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  meta: {
+  teamName: {
+    flex: 1,
     fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 18,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
+    fontWeight: '700',
+    color: ui.white,
+    textAlign: 'center',
   },
-  sectionHeading: {
-    ...typography.buttonSecondary,
-    color: colors.primary,
+  seriesScore: {
+    fontSize: 40,
+    fontWeight: '800',
+    lineHeight: 44,
+    color: ui.gold,
+    minWidth: 36,
+    textAlign: 'center',
   },
-  gameCard: {
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    gap: 4,
+  seriesDash: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: ui.gold,
+  },
+  goldRule: {
+    height: 1.5,
+    backgroundColor: ui.gold,
+    opacity: 0.85,
+    marginHorizontal: 24,
+  },
+  infoRow: {
+    gap: 2,
+    alignItems: 'center',
+  },
+  infoItem: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: 'rgba(247, 242, 232, 0.78)',
+  },
+  sheet: {
+    flex: 1,
+    backgroundColor: ui.cream,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingTop: 14,
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+  },
+  listTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    color: ui.green,
+    marginBottom: 6,
+  },
+  list: {
+    flex: 1,
+    minHeight: 0,
+  },
+  listContent: {
+    paddingBottom: 8,
+  },
+  gameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: ui.line,
+  },
+  gameText: {
+    flex: 1,
+    gap: 2,
   },
   gameDate: {
-    ...typography.infoLabel,
-    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '500',
+    color: ui.textMuted,
   },
   gameScore: {
-    ...typography.buttonSecondary,
-    color: colors.text,
-  },
-  gameOutcome: {
     fontSize: 14,
-    fontWeight: '600',
-    color: colors.primaryMuted,
+    fontWeight: '700',
+    color: ui.text,
   },
-  gameMeta: {
+  gameWinner: {
     fontSize: 13,
-    color: colors.textSecondary,
+    fontWeight: '600',
+    color: ui.green,
   },
   detailLink: {
-    minHeight: 40,
-    justifyContent: 'center',
-    marginTop: spacing.xs,
+    fontSize: 12,
+    fontWeight: '700',
+    color: ui.gold,
   },
-  detailLinkLabel: {
-    ...typography.buttonSecondary,
-    color: colors.primary,
+  primaryButton: {
+    minHeight: 52,
+    borderRadius: 10,
+    backgroundColor: ui.green,
+    borderWidth: 1,
+    borderColor: ui.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    paddingHorizontal: 12,
+  },
+  primaryLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: ui.white,
+    textAlign: 'center',
   },
   empty: {
-    ...typography.body,
-    color: colors.textSecondary,
+    fontSize: 15,
+    fontWeight: '600',
+    color: ui.textMuted,
     textAlign: 'center',
+    marginTop: 40,
+  },
+  pressed: {
+    opacity: 0.82,
   },
 });

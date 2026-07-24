@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   roundBlockLatest: {
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.goldMuted,
   },
   roundTitle: {
     fontSize: 15,

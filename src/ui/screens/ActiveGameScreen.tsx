@@ -4,7 +4,6 @@ import {
   SafeAreaView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { useMemo, useState } from 'react';
@@ -14,18 +13,25 @@ import type { FinishType } from '../../engine/models';
 import type { GameActivityEvent, GameStatus } from '../gameActivity';
 import { resolveGameMode } from '../gameMode';
 import { GameActionsSheet } from '../components/GameActionsSheet';
-import { PrimaryButton } from '../components/PrimaryButton';
-import { SecondaryButton } from '../components/SecondaryButton';
 import { ScoreSheetTable } from '../components/ScoreSheetTable';
 import { buildScoreSheet } from '../scoreSheet';
 import {
   remainingRoundCount,
   resolveTargetRoundCount,
 } from '../targetRoundCount';
-import { colors, radii, spacing, typography } from '../theme';
 
 export type { GameStatus } from '../gameActivity';
 export type { GameActivityEvent } from '../gameActivity';
+
+/** Referans aktif oyun paleti. */
+const active = {
+  green: '#1F5E3B',
+  greenDeep: '#174A2E',
+  cream: '#F7F2E8',
+  gold: '#C8A44D',
+  white: '#FFFFFF',
+  textMuted: 'rgba(247, 242, 232, 0.78)',
+} as const;
 
 export type ActiveGamePlayer = {
   id: string;
@@ -82,6 +88,26 @@ type ActiveGameScreenProps = {
   onAbandon: () => void;
 };
 
+type FooterButtonProps = {
+  label: string;
+  onPress: () => void;
+};
+
+function FooterButton({ label, onPress }: FooterButtonProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.footerButton,
+        pressed && styles.footerButtonPressed,
+      ]}
+    >
+      <Text style={styles.footerButtonLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
 export function ActiveGameScreen({
   game,
   onHome,
@@ -91,13 +117,11 @@ export function ActiveGameScreen({
   onFinishEarly,
   onAbandon,
 }: ActiveGameScreenProps) {
-  const { height } = useWindowDimensions();
-  const compact = height < 720;
   const isIndividual = resolveGameMode(game.gameMode) === 'individual';
   const playedRounds = game.rounds.length;
   const targetRounds = resolveTargetRoundCount(game.targetRoundCount);
   const roundsLeft = remainingRoundCount(playedRounds, targetRounds);
-  const sheet = useMemo(() => buildScoreSheet(game), [game]);
+  const model = useMemo(() => buildScoreSheet(game), [game]);
   const [actionsOpen, setActionsOpen] = useState(false);
 
   function confirmFinishEarly() {
@@ -124,47 +148,82 @@ export function ActiveGameScreen({
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={[styles.shell, compact && styles.shellCompact]}>
+      <View style={styles.header}>
         <View style={styles.topBar}>
           <Pressable
             accessibilityRole="button"
             onPress={onHome}
+            hitSlop={8}
             style={({ pressed }) => [
-              styles.homeButton,
-              pressed && styles.homePressed,
+              styles.backButton,
+              pressed && styles.backPressed,
             ]}
           >
-            <Text style={styles.homeLabel}>Ana Sayfa</Text>
+            <Text style={styles.backLabel}>‹</Text>
           </Pressable>
-          <Text style={styles.brand}>101 YAZ-BOZ</Text>
-        </View>
-
-        <View style={styles.header}>
-          <Text style={[styles.title, compact && styles.titleCompact]}>
-            {isIndividual ? 'Tekli Oyun' : 'Eşli Oyun'}
-          </Text>
-          <Text style={styles.roundInfo}>
-            El {playedRounds}/{targetRounds} · Kalan {roundsLeft}
-          </Text>
-        </View>
-
-        <View style={styles.sheetWrap}>
-          <ScoreSheetTable sheet={sheet} compact={compact} />
-        </View>
-
-        <View style={styles.actionsBlock}>
-          <PrimaryButton label="Yeni El" onPress={onNewRound} />
-          <SecondaryButton
-            label="Ceza Ekle"
-            onPress={onAddPenalty}
-            style={styles.fullButton}
-          />
-          <SecondaryButton
-            label="Oyun İşlemleri"
+          <View style={styles.titleBlock}>
+            <Text style={styles.title}>Aktif Oyun</Text>
+            <Text style={styles.roundInfo}>
+              El {playedRounds}/{targetRounds} · Kalan {roundsLeft}
+            </Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
             onPress={() => setActionsOpen(true)}
-            style={styles.fullButton}
-          />
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.menuButton,
+              pressed && styles.backPressed,
+            ]}
+          >
+            <Text style={styles.menuDots}>⋮</Text>
+          </Pressable>
         </View>
+
+        {isIndividual ? (
+          <View style={styles.individualBanner}>
+            {model.playerNames.map((name) => (
+              <Text key={name} style={styles.individualPlayer} numberOfLines={1}>
+                {name}
+              </Text>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.teamBanner}>
+            <View style={styles.teamSide}>
+              <Text style={styles.teamName} numberOfLines={1}>
+                {game.teams[0].name}
+              </Text>
+              <Text style={styles.playerNames} numberOfLines={1}>
+                {game.teams[0].players[0].name} ·{' '}
+                {game.teams[0].players[1].name}
+              </Text>
+            </View>
+            <View style={styles.teamGold} />
+            <View style={styles.teamSide}>
+              <Text style={styles.teamName} numberOfLines={1}>
+                {game.teams[1].name}
+              </Text>
+              <Text style={styles.playerNames} numberOfLines={1}>
+                {game.teams[1].players[0].name} ·{' '}
+                {game.teams[1].players[1].name}
+              </Text>
+            </View>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.tableArea}>
+        <ScoreSheetTable model={model} />
+      </View>
+
+      <View style={styles.footer}>
+        <FooterButton label="+ Yeni El" onPress={onNewRound} />
+        <FooterButton label="+ Ceza" onPress={onAddPenalty} />
+        <FooterButton
+          label="≡ İşlemler"
+          onPress={() => setActionsOpen(true)}
+        />
       </View>
 
       <GameActionsSheet
@@ -181,66 +240,138 @@ export function ActiveGameScreen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: active.green,
   },
-  shell: {
-    flex: 1,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
-    gap: spacing.sm,
-  },
-  shellCompact: {
-    gap: spacing.xs,
+  header: {
+    backgroundColor: active.green,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+    gap: 10,
   },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    minHeight: 44,
   },
-  homeButton: {
-    minHeight: 40,
-    paddingHorizontal: spacing.sm,
+  backButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radii.sm,
   },
-  homePressed: {
-    backgroundColor: colors.surface,
+  menuButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  homeLabel: {
-    ...typography.buttonSecondary,
-    color: colors.primary,
+  backPressed: {
+    opacity: 0.7,
   },
-  brand: {
-    ...typography.brand,
-    color: colors.primaryMuted,
-    textTransform: 'uppercase',
+  backLabel: {
+    fontSize: 32,
+    fontWeight: '300',
+    color: active.white,
+    marginTop: -2,
   },
-  header: {
-    gap: 2,
+  menuDots: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: active.white,
+  },
+  titleBlock: {
+    flex: 1,
+    alignItems: 'center',
   },
   title: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: '700',
-    color: colors.text,
-  },
-  titleCompact: {
-    fontSize: 20,
+    color: active.white,
   },
   roundInfo: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '500',
+    color: active.textMuted,
+    marginTop: 1,
   },
-  sheetWrap: {
+  teamBanner: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 0,
+  },
+  teamSide: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 6,
+  },
+  teamGold: {
+    width: 1.5,
+    backgroundColor: active.gold,
+    alignSelf: 'stretch',
+  },
+  teamName: {
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: active.gold,
+    textAlign: 'center',
+  },
+  playerNames: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: active.white,
+    textAlign: 'center',
+  },
+  individualBanner: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 4,
+  },
+  individualPlayer: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: active.white,
+    maxWidth: '45%',
+    textAlign: 'center',
+  },
+  tableArea: {
     flex: 1,
     minHeight: 0,
+    backgroundColor: active.cream,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 8,
   },
-  actionsBlock: {
-    gap: spacing.xs,
+  footer: {
+    backgroundColor: active.green,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 10,
   },
-  fullButton: {
-    flexGrow: 0,
-    width: '100%',
+  footerButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 10,
+    backgroundColor: active.greenDeep,
+    borderWidth: 1,
+    borderColor: active.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  footerButtonPressed: {
+    opacity: 0.85,
+  },
+  footerButtonLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: active.white,
+    textAlign: 'center',
   },
 });
