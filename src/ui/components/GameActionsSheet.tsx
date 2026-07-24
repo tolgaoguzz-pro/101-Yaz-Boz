@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 
-import { colors, radii, spacing, typography } from '../theme';
+import { chrome, colors, layout, radii, spacing, typography } from '../theme';
 
 type GameActionsSheetProps = {
   visible: boolean;
@@ -44,7 +44,7 @@ export function GameActionsSheet({
               }}
               style={({ pressed }) => [
                 styles.action,
-                pressed && styles.actionPressed,
+                pressed && chrome.pressed,
               ]}
             >
               <Text style={styles.actionLabel}>Oyunu Durdur</Text>
@@ -58,7 +58,7 @@ export function GameActionsSheet({
               }}
               style={({ pressed }) => [
                 styles.action,
-                pressed && styles.actionPressed,
+                pressed && chrome.pressed,
               ]}
             >
               <Text style={styles.actionLabel}>Oyunu Bitir</Text>
@@ -73,7 +73,7 @@ export function GameActionsSheet({
               style={({ pressed }) => [
                 styles.action,
                 styles.dangerAction,
-                pressed && styles.actionPressed,
+                pressed && chrome.pressed,
               ]}
             >
               <Text style={[styles.actionLabel, styles.dangerLabel]}>
@@ -86,7 +86,7 @@ export function GameActionsSheet({
               onPress={onClose}
               style={({ pressed }) => [
                 styles.cancel,
-                pressed && styles.actionPressed,
+                pressed && chrome.pressed,
               ]}
             >
               <Text style={styles.cancelLabel}>Vazgeç</Text>
@@ -101,7 +101,7 @@ export function GameActionsSheet({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(10, 47, 35, 0.72)',
+    backgroundColor: 'rgba(23, 74, 46, 0.72)',
     justifyContent: 'flex-end',
   },
   safe: {
@@ -110,22 +110,20 @@ const styles = StyleSheet.create({
   sheet: {
     marginHorizontal: spacing.md,
     marginBottom: spacing.md,
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: colors.creamCard,
     borderRadius: radii.lg,
     borderWidth: 1,
-    borderColor: colors.goldMuted,
+    borderColor: colors.gold,
     padding: spacing.md,
     gap: spacing.sm,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.text,
+    ...typography.title,
     textAlign: 'center',
     marginBottom: spacing.xs,
   },
   action: {
-    minHeight: 52,
+    minHeight: layout.buttonHeight,
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
@@ -135,26 +133,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   dangerAction: {
-    borderColor: colors.goldMuted,
-    backgroundColor: colors.surface,
-  },
-  actionPressed: {
-    opacity: 0.88,
+    borderColor: colors.gold,
+    backgroundColor: colors.creamHeader,
   },
   actionLabel: {
     ...typography.buttonSecondary,
-    color: colors.primary,
+    color: colors.green,
   },
   dangerLabel: {
-    color: colors.feltDeep,
+    color: colors.greenDeep,
   },
   cancel: {
-    minHeight: 48,
+    minHeight: layout.buttonHeight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cancelLabel: {
-    ...typography.buttonSecondary,
-    color: colors.textSecondary,
+    ...typography.buttonGhost,
   },
 });

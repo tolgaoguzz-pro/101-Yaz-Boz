@@ -19,18 +19,7 @@ import {
   buildTournamentGameRow,
   TournamentGameRowModel,
 } from '../tournamentPresentation';
-
-/** Referans Turnuva Detay paleti. */
-const ui = {
-  green: '#1F5E3B',
-  greenDeep: '#174A2E',
-  cream: '#F7F2E8',
-  gold: '#C8A44D',
-  white: '#FFFFFF',
-  text: '#263238',
-  textMuted: '#7A847C',
-  line: 'rgba(200, 164, 77, 0.35)',
-} as const;
+import { colors as ui, layout, radii } from '../theme';
 
 type TournamentDetailScreenProps = {
   matchupKey: string;
@@ -381,7 +370,7 @@ const styles = StyleSheet.create({
     color: ui.gold,
   },
   primaryButton: {
-    minHeight: 52,
+    minHeight: layout.buttonHeight,
     borderRadius: 10,
     backgroundColor: ui.green,
     borderWidth: 1,

@@ -11,17 +11,7 @@ import {
 import { CompletedGameRecord } from '../../domain/completedGame';
 import { buildAllMatchupSeries } from '../../domain/tournament';
 import { listCompletedGames } from '../../persistence/completedGameRepository';
-
-/** Home ile aynı referans paleti. */
-const ui = {
-  green: '#1F5E3B',
-  cream: '#F7F2E8',
-  gold: '#C8A44D',
-  white: '#FFFFFF',
-  text: '#263238',
-  textMuted: '#7A847C',
-  line: '#D9D2C4',
-} as const;
+import { colors as ui, layout, radii } from '../theme';
 
 type StatsScreenProps = {
   onBack: () => void;
@@ -230,46 +220,46 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    minHeight: layout.headerMinHeight,
     paddingHorizontal: 8,
-    paddingBottom: 12,
+    paddingBottom: 6,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: layout.headerIcon,
+    height: layout.headerIcon,
     alignItems: 'center',
     justifyContent: 'center',
   },
   backSpacer: {
-    width: 40,
+    width: layout.headerIcon,
   },
   backLabel: {
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: '300',
-    color: ui.gold,
+    color: ui.white,
     marginTop: -2,
   },
   titleBlock: {
     flex: 1,
     alignItems: 'center',
-    gap: 4,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: 1.4,
-    color: ui.gold,
+    fontSize: 16,
+    fontWeight: '700',
+    color: ui.white,
   },
   goldRule: {
-    width: 48,
-    height: 2,
+    width: 40,
+    height: 1.5,
     backgroundColor: ui.gold,
     borderRadius: 1,
+    marginTop: 2,
   },
   sheet: {
     flex: 1,
     backgroundColor: ui.cream,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    borderTopLeftRadius: radii.sheet,
+    borderTopRightRadius: radii.sheet,
     paddingHorizontal: 14,
     paddingTop: 16,
     paddingBottom: 12,
@@ -283,7 +273,7 @@ const styles = StyleSheet.create({
   },
   panel: {
     backgroundColor: ui.white,
-    borderRadius: 12,
+    borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: ui.gold,
     overflow: 'hidden',
@@ -327,7 +317,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   primaryButton: {
-    minHeight: 52,
+    minHeight: layout.buttonHeight,
     borderRadius: 10,
     backgroundColor: ui.green,
     borderWidth: 1,

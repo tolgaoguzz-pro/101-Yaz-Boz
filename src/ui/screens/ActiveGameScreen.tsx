@@ -20,19 +20,10 @@ import {
   remainingRoundCount,
   resolveTargetRoundCount,
 } from '../targetRoundCount';
+import { colors as active, layout, radii } from '../theme';
 
 export type { GameStatus } from '../gameActivity';
 export type { GameActivityEvent } from '../gameActivity';
-
-/** Referans aktif oyun paleti. */
-const active = {
-  green: '#1F5E3B',
-  greenDeep: '#174A2E',
-  cream: '#F7F2E8',
-  gold: '#C8A44D',
-  white: '#FFFFFF',
-  textMuted: 'rgba(247, 242, 232, 0.78)',
-} as const;
 
 export type ActiveGamePlayer = {
   id: string;
@@ -98,14 +89,18 @@ export function ActiveGameScreen({
   onFinishEarly,
   onAbandon,
 }: ActiveGameScreenProps) {
-  const { height } = useWindowDimensions();
-  const compact = height < 700;
+  const { height, width } = useWindowDimensions();
+  const compact = height < 700 || width < 380;
   const isIndividual = resolveGameMode(game.gameMode) === 'individual';
   const playedRounds = game.rounds.length;
   const targetRounds = resolveTargetRoundCount(game.targetRoundCount);
   const roundsLeft = remainingRoundCount(playedRounds, targetRounds);
   const model = useMemo(() => buildScoreSheet(game), [game]);
   const [actionsOpen, setActionsOpen] = useState(false);
+
+  function openActions() {
+    setActionsOpen(true);
+  }
 
   function confirmFinishEarly() {
     Alert.alert(
@@ -135,6 +130,7 @@ export function ActiveGameScreen({
         <View style={styles.topBar}>
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel="Geri"
             onPress={onHome}
             hitSlop={8}
             style={({ pressed }) => [
@@ -144,24 +140,32 @@ export function ActiveGameScreen({
           >
             <Text style={styles.backLabel}>‹</Text>
           </Pressable>
-          <View style={styles.titleBlock}>
-            <Text style={[styles.title, compact && styles.titleCompact]}>
-              Aktif Oyun
-            </Text>
+          <View style={styles.titleBlock} pointerEvents="none">
+            <Text style={styles.title}>Aktif Oyun</Text>
             <Text style={styles.roundInfo}>
               El {playedRounds}/{targetRounds} · Kalan {roundsLeft}
             </Text>
           </View>
-          <View style={styles.iconButton} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="İşlemler"
+            onPress={openActions}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.iconButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.menuLabel}>⋮</Text>
+          </Pressable>
         </View>
 
         {isIndividual ? (
           <View style={styles.individualBanner}>
-            {model.playerNames.map((name) => (
-              <Text key={name} style={styles.individualPlayer} numberOfLines={1}>
-                {name}
-              </Text>
-            ))}
+            <Text style={styles.individualTitle}>Bireysel Skor</Text>
+            <Text style={styles.individualPlayers} numberOfLines={1}>
+              {model.playerNames.join(' · ')}
+            </Text>
           </View>
         ) : (
           <View style={styles.teamBanner}>
@@ -189,7 +193,7 @@ export function ActiveGameScreen({
       </View>
 
       <View style={[styles.tableArea, compact && styles.tableAreaCompact]}>
-        <ScoreSheetTable model={model} />
+        <ScoreSheetTable model={model} compact={compact} />
       </View>
 
       <View style={[styles.footer, compact && styles.footerCompact]}>
@@ -197,35 +201,57 @@ export function ActiveGameScreen({
           accessibilityRole="button"
           onPress={onNewRound}
           style={({ pressed }) => [
-            styles.primaryButton,
-            compact && styles.primaryButtonCompact,
+            styles.actionButton,
+            styles.primaryAction,
+            compact && styles.actionButtonCompact,
             pressed && styles.pressed,
           ]}
         >
-          <Text style={styles.primaryLabel}>+ Yeni El</Text>
+          <Text
+            style={[styles.actionLabel, styles.primaryActionLabel]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
+            + Yeni El
+          </Text>
         </Pressable>
-        <View style={styles.secondaryRow}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={onAddPenalty}
-            style={({ pressed }) => [
-              styles.secondaryButton,
-              pressed && styles.pressed,
-            ]}
+        <Pressable
+          accessibilityRole="button"
+          onPress={onAddPenalty}
+          style={({ pressed }) => [
+            styles.actionButton,
+            compact && styles.actionButtonCompact,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text
+            style={styles.actionLabel}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
           >
-            <Text style={styles.secondaryLabel}>Ceza</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setActionsOpen(true)}
-            style={({ pressed }) => [
-              styles.secondaryButton,
-              pressed && styles.pressed,
-            ]}
+            + Ceza Ekle
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={openActions}
+          style={({ pressed }) => [
+            styles.actionButton,
+            compact && styles.actionButtonCompact,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text
+            style={styles.actionLabel}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
           >
-            <Text style={styles.secondaryLabel}>İşlemler</Text>
-          </Pressable>
-        </View>
+            ≡ İşlemler
+          </Text>
+        </Pressable>
       </View>
 
       <GameActionsSheet
@@ -246,22 +272,22 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: active.green,
-    paddingHorizontal: 12,
-    paddingBottom: 10,
-    gap: 8,
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+    gap: 6,
   },
   headerCompact: {
-    paddingBottom: 6,
-    gap: 6,
+    paddingBottom: 5,
+    gap: 4,
   },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 40,
+    minHeight: layout.headerMinHeight,
   },
   iconButton: {
     width: 40,
-    height: 40,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -269,38 +295,43 @@ const styles = StyleSheet.create({
     opacity: 0.78,
   },
   backLabel: {
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: '300',
-    color: active.white,
+    color: active.gold,
     marginTop: -2,
+  },
+  menuLabel: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: active.white,
+    lineHeight: 24,
   },
   titleBlock: {
     flex: 1,
     alignItems: 'center',
   },
   title: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
     color: active.white,
   },
-  titleCompact: {
-    fontSize: 16,
-  },
   roundInfo: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '500',
-    color: active.textMuted,
+    color: active.headerMuted,
     marginTop: 1,
   },
   teamBanner: {
     flexDirection: 'row',
     alignItems: 'stretch',
+    paddingBottom: 2,
   },
   teamSide: {
     flex: 1,
     alignItems: 'center',
     gap: 2,
     paddingHorizontal: 6,
+    paddingVertical: 2,
   },
   teamGold: {
     width: 1.5,
@@ -310,7 +341,7 @@ const styles = StyleSheet.create({
   teamName: {
     fontSize: 12,
     fontWeight: '800',
-    letterSpacing: 0.6,
+    letterSpacing: 0.5,
     textTransform: 'uppercase',
     color: active.gold,
     textAlign: 'center',
@@ -318,83 +349,87 @@ const styles = StyleSheet.create({
   playerNames: {
     fontSize: 11,
     fontWeight: '500',
-    color: active.white,
+    color: active.playerCream,
     textAlign: 'center',
   },
   individualBanner: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 4,
+    alignItems: 'center',
+    gap: 2,
+    paddingBottom: 2,
+    paddingHorizontal: 8,
   },
-  individualPlayer: {
+  individualTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: active.gold,
+  },
+  individualPlayers: {
     fontSize: 11,
-    fontWeight: '600',
-    color: active.white,
-    maxWidth: '45%',
+    fontWeight: '500',
+    color: active.playerCream,
     textAlign: 'center',
   },
   tableArea: {
     flex: 1,
     minHeight: 0,
     backgroundColor: active.cream,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
     paddingHorizontal: 10,
     paddingTop: 8,
-    paddingBottom: 6,
+    paddingBottom: 4,
   },
   tableAreaCompact: {
     paddingHorizontal: 8,
     paddingTop: 6,
-    paddingBottom: 4,
+    paddingBottom: 2,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
   },
   footer: {
+    flexDirection: 'row',
     backgroundColor: active.green,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingTop: 8,
-    paddingBottom: 10,
+    paddingBottom: 8,
     gap: 8,
   },
   footerCompact: {
+    paddingHorizontal: 8,
     paddingTop: 6,
-    paddingBottom: 8,
+    paddingBottom: 6,
     gap: 6,
   },
-  primaryButton: {
-    minHeight: 52,
+  actionButton: {
+    flex: 1,
+    minHeight: layout.buttonHeight,
     borderRadius: 10,
     backgroundColor: active.greenDeep,
+    borderWidth: 1,
+    borderColor: 'rgba(200, 164, 77, 0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  actionButtonCompact: {
+    minHeight: layout.buttonHeightCompact,
+  },
+  primaryAction: {
+    flex: 1.15,
     borderWidth: 1.5,
     borderColor: active.gold,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: active.greenDeep,
   },
-  primaryButtonCompact: {
-    minHeight: 48,
-  },
-  primaryLabel: {
-    fontSize: 17,
-    fontWeight: '800',
+  actionLabel: {
+    fontSize: 13,
+    fontWeight: '700',
     color: active.white,
-    letterSpacing: 0.3,
+    textAlign: 'center',
   },
-  secondaryRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  secondaryButton: {
-    flex: 1,
-    minHeight: 42,
-    borderRadius: 10,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: 'rgba(200, 164, 77, 0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  secondaryLabel: {
+  primaryActionLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: active.textMuted,
+    fontWeight: '800',
   },
 });

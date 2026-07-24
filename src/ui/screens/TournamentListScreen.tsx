@@ -15,18 +15,7 @@ import {
   buildTournamentListCard,
   TournamentListCardModel,
 } from '../tournamentPresentation';
-
-/** Referans Turnuvalar paleti. */
-const ui = {
-  green: '#1F5E3B',
-  greenDeep: '#174A2E',
-  cream: '#F7F2E8',
-  gold: '#C8A44D',
-  white: '#FFFFFF',
-  text: '#263238',
-  textMuted: '#7A847C',
-  line: '#D9D2C4',
-} as const;
+import { colors as ui, layout, radii } from '../theme';
 
 type TournamentListScreenProps = {
   onBack: () => void;
@@ -300,7 +289,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 14,
   },
   playAgainButton: {
-    minHeight: 44,
+    minHeight: layout.buttonHeight,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 12,

@@ -17,22 +17,7 @@ import { gameModeLabel, resolveGameMode } from '../gameMode';
 import { resolveGameStatus } from '../gameLifecycle';
 import { resolveTargetRoundCount } from '../targetRoundCount';
 import { ActiveGameData } from './ActiveGameScreen';
-
-const home = {
-  felt: '#1F5E3B',
-  feltDeep: '#174A2E',
-  feltLight: '#2A6E47',
-  cream: '#F7F2E8',
-  gold: '#C8A44D',
-  text: '#263238',
-  textMuted: '#6B736C',
-  white: '#FFFFFF',
-  card: '#FFFFFF',
-  cardBorder: 'rgba(200, 164, 77, 0.4)',
-  tileFace: '#FFFEF8',
-  tileRed: '#C62828',
-  tileBlack: '#1A1A1A',
-} as const;
+import { colors as home, layout, radii } from '../theme';
 
 type HomeScreenProps = {
   activeGame: ActiveGameData | null;

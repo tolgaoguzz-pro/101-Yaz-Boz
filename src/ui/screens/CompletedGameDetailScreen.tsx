@@ -24,17 +24,7 @@ import { ScoreSheetTable } from '../components/ScoreSheetTable';
 import { gameModeLabel, resolveGameMode } from '../gameMode';
 import { buildScoreSheet } from '../scoreSheet';
 import { ActiveGameData } from './ActiveGameScreen';
-
-/** Referans Tamamlanan Oyun paleti. */
-const ui = {
-  green: '#1F5E3B',
-  cream: '#F7F2E8',
-  gold: '#C8A44D',
-  white: '#FFFFFF',
-  text: '#263238',
-  textMuted: '#7A847C',
-  line: '#D9D2C4',
-} as const;
+import { colors as ui, layout, radii } from '../theme';
 
 type CompletedGameDetailScreenProps = {
   gameId: string;
@@ -337,7 +327,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   primaryButton: {
-    minHeight: 50,
+    minHeight: layout.buttonHeight,
     borderRadius: 10,
     backgroundColor: ui.green,
     borderWidth: 1,
@@ -353,7 +343,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   secondaryButton: {
-    minHeight: 46,
+    minHeight: layout.buttonHeight,
     borderRadius: 10,
     backgroundColor: ui.white,
     borderWidth: 1,

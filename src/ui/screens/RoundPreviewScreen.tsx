@@ -10,19 +10,9 @@ import { playerIdFromIndividualTeamId } from '../individualRound';
 import { finishTypeLabel } from '../roundEntry/finishLabels';
 import { RoundPreviewMeta } from '../roundEntry/previewState';
 import { ActiveGameData } from './ActiveGameScreen';
+import { colors as ui, layout, radii } from '../theme';
 
 export type { RoundPreviewMeta } from '../roundEntry/previewState';
-
-/** Home / ActiveGame ile aynı referans paleti. */
-const ui = {
-  green: '#1F5E3B',
-  cream: '#F7F2E8',
-  gold: '#C8A44D',
-  white: '#FFFFFF',
-  text: '#263238',
-  textMuted: '#7A847C',
-  line: '#D9D2C4',
-} as const;
 
 type RoundPreviewScreenProps = {
   game: ActiveGameData;
@@ -298,7 +288,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   primaryButton: {
-    minHeight: 52,
+    minHeight: layout.buttonHeight,
     borderRadius: 10,
     backgroundColor: ui.green,
     borderWidth: 1,
@@ -313,7 +303,7 @@ const styles = StyleSheet.create({
     color: ui.white,
   },
   secondaryButton: {
-    minHeight: 46,
+    minHeight: layout.buttonHeight,
     borderRadius: 10,
     backgroundColor: ui.white,
     borderWidth: 1,

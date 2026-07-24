@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
 
-import { colors, radii, spacing, typography } from '../theme';
+import { chrome, colors, layout, radii, spacing, typography } from '../theme';
 
 type ScreenBackButtonProps = {
   onPress: () => void;
@@ -19,7 +19,6 @@ export function ScreenBackButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.backButton,
-        light && styles.backButtonLight,
         pressed && (light ? styles.backPressedLight : styles.backPressed),
       ]}
     >
@@ -35,7 +34,7 @@ type GoldRuleProps = {
 };
 
 export function GoldRule({ style }: GoldRuleProps) {
-  return <View style={[styles.goldRule, style]} />;
+  return <View style={[chrome.goldRule, style]} />;
 }
 
 type SectionLabelProps = {
@@ -54,40 +53,32 @@ export function SectionLabel({ children, light = false }: SectionLabelProps) {
 const styles = StyleSheet.create({
   backButton: {
     alignSelf: 'flex-start',
-    minHeight: 40,
-    minWidth: 44,
+    minHeight: layout.headerIcon,
+    minWidth: layout.headerIcon,
     paddingHorizontal: spacing.sm,
     justifyContent: 'center',
     borderRadius: radii.sm,
   },
-  backButtonLight: {},
   backPressed: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.creamHeader,
   },
   backPressedLight: {
-    backgroundColor: 'rgba(247, 241, 231, 0.12)',
+    backgroundColor: 'rgba(247, 242, 232, 0.12)',
   },
   backLabel: {
     ...typography.buttonSecondary,
-    color: colors.primary,
+    color: colors.green,
   },
   backLabelLight: {
-    color: colors.textOnDark,
-  },
-  goldRule: {
-    height: StyleSheet.hairlineWidth * 2,
-    backgroundColor: colors.gold,
-    opacity: 0.85,
-    alignSelf: 'stretch',
+    color: colors.headerMuted,
   },
   sectionLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.6,
+    ...typography.section,
+    color: colors.gold,
     textTransform: 'uppercase',
-    color: colors.goldMuted,
   },
   sectionLabelLight: {
-    color: colors.goldSoft,
+    color: colors.gold,
+    opacity: 0.9,
   },
 });

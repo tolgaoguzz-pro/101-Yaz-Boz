@@ -4,20 +4,7 @@ import { useMemo } from 'react';
 import { DEVELOPER_CREDIT } from '../../config/appInfo';
 import { calculateGameResult } from '../gameResult';
 import { ActiveGameData } from './ActiveGameScreen';
-
-/** Referans Oyun Bitti paleti. */
-const ui = {
-  green: '#1F5E3B',
-  greenDeep: '#174A2E',
-  cream: '#F7F2E8',
-  gold: '#C8A44D',
-  silver: '#A8B0B5',
-  bronze: '#B08D57',
-  white: '#FFFFFF',
-  text: '#263238',
-  textMuted: '#7A847C',
-  line: '#D9D2C4',
-} as const;
+import { colors as ui, layout, radii } from '../theme';
 
 type GameResultScreenProps = {
   game: ActiveGameData;
@@ -401,7 +388,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderTopWidth: 1,
     borderTopColor: ui.gold,
-    minHeight: 52,
+    minHeight: layout.buttonHeight,
   },
   teamBox: {
     flex: 1,
@@ -477,7 +464,7 @@ const styles = StyleSheet.create({
     marginTop: 'auto',
   },
   primaryButton: {
-    minHeight: 50,
+    minHeight: layout.buttonHeight,
     borderRadius: 10,
     backgroundColor: ui.greenDeep,
     borderWidth: 1,
@@ -493,7 +480,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   secondaryButton: {
-    minHeight: 46,
+    minHeight: layout.buttonHeight,
     borderRadius: 10,
     backgroundColor: ui.cream,
     borderWidth: 1,

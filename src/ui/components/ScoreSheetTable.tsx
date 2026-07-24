@@ -9,42 +9,26 @@ import {
   getScoreSheetBodyRows,
   getScoreSheetTotalRow,
 } from '../scoreSheet';
-
-/** Yaz-boz kağıdı paleti. */
-const sheet = {
-  cream: '#F7F2E8',
-  creamHeader: '#EFE8DB',
-  creamTotal: '#E8DFD0',
-  penalty: '#F7EFC0',
-  gold: '#C8A44D',
-  goldSoft: 'rgba(200, 164, 77, 0.55)',
-  text: '#263238',
-  textMuted: '#6B736C',
-  line: '#D4CBB8',
-  green: '#1F5E3B',
-  white: '#FFFFFF',
-} as const;
-
-const ROW_HEIGHT = 36;
-const HEADER_HEIGHT = 40;
-const TOTAL_HEIGHT = 42;
-const LABEL_WIDTH = 46;
+import { colors, layout, radii } from '../theme';
 
 type ScoreSheetTableProps = {
   model: ScoreSheetModel;
+  compact?: boolean;
 };
 
 function CellText({
   cell,
   isTotal,
   isHeader,
+  compact,
 }: {
   cell: ScoreSheetCell;
   isTotal?: boolean;
   isHeader?: boolean;
+  compact?: boolean;
 }) {
   if (cell.kind === 'dash') {
-    return <Text style={styles.dash}>—</Text>;
+    return <Text style={[styles.dash, compact && styles.dashCompact]}>—</Text>;
   }
   if (cell.kind === 'empty') {
     return <Text style={styles.dash}> </Text>;
@@ -53,11 +37,16 @@ function CellText({
     <Text
       style={[
         styles.cellValue,
+        compact && styles.cellValueCompact,
         isHeader && styles.headerCellValue,
+        isHeader && compact && styles.headerCellValueCompact,
         isTotal && styles.cellTotal,
+        isTotal && compact && styles.cellTotalCompact,
         cell.emphasize && !isTotal && styles.cellEmphasize,
       ]}
       numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.7}
     >
       {cell.text}
     </Text>
@@ -67,9 +56,11 @@ function CellText({
 function SheetRowView({
   row,
   isHeader,
+  compact,
 }: {
   row: ScoreSheetRow;
   isHeader?: boolean;
+  compact?: boolean;
 }) {
   const isTotal = row.kind === 'total';
   const isPenalty = row.kind === 'penalty';
@@ -78,17 +69,28 @@ function SheetRowView({
     <View
       style={[
         styles.row,
+        compact && styles.rowCompact,
         isHeader && styles.headerRow,
+        isHeader && compact && styles.headerRowCompact,
         isPenalty && styles.penaltyRow,
         isTotal && styles.totalRow,
+        isTotal && compact && styles.totalRowCompact,
       ]}
     >
-      <View style={[styles.labelCell, styles.gridBorder]}>
+      <View
+        style={[
+          styles.labelCell,
+          compact && styles.labelCellCompact,
+          styles.gridBorder,
+        ]}
+      >
         <Text
           style={[
             styles.labelText,
+            compact && styles.labelTextCompact,
             isHeader && styles.headerText,
             isTotal && styles.totalLabel,
+            isPenalty && styles.penaltyLabel,
           ]}
           numberOfLines={1}
         >
@@ -109,14 +111,22 @@ function SheetRowView({
             index === row.cells.length - 1 && styles.gridBorderLast,
           ]}
         >
-          <CellText cell={cell} isTotal={isTotal} isHeader={isHeader} />
+          <CellText
+            cell={cell}
+            isTotal={isTotal}
+            isHeader={isHeader}
+            compact={compact}
+          />
         </View>
       ))}
     </View>
   );
 }
 
-export function ScoreSheetTable({ model }: ScoreSheetTableProps) {
+export function ScoreSheetTable({
+  model,
+  compact = false,
+}: ScoreSheetTableProps) {
   const bodyRows = getScoreSheetBodyRows(model);
   const totalRow = getScoreSheetTotalRow(model);
   const scrollRef = useRef<ScrollView>(null);
@@ -154,10 +164,15 @@ export function ScoreSheetTable({ model }: ScoreSheetTableProps) {
     stickToEndRef.current = false;
   }
 
+  const showTeamTotals =
+    model.gameMode === 'paired' &&
+    model.teamTotals != null &&
+    model.teamNames != null;
+
   return (
     <View style={styles.frame}>
       <View style={styles.stickyHeader}>
-        <SheetRowView row={headerRow} isHeader />
+        <SheetRowView row={headerRow} isHeader compact={compact} />
       </View>
 
       <ScrollView
@@ -171,29 +186,43 @@ export function ScoreSheetTable({ model }: ScoreSheetTableProps) {
         {bodyRows.length === 0 ? (
           <Text style={styles.empty}>Henüz el yok</Text>
         ) : (
-          bodyRows.map((row) => <SheetRowView key={row.id} row={row} />)
+          bodyRows.map((row) => (
+            <SheetRowView key={row.id} row={row} compact={compact} />
+          ))
         )}
       </ScrollView>
 
       <View style={styles.stickyFooter}>
-        {totalRow ? <SheetRowView row={totalRow} /> : null}
+        {totalRow ? <SheetRowView row={totalRow} compact={compact} /> : null}
 
-        {model.gameMode === 'paired' &&
-        model.teamTotals &&
-        model.teamNames ? (
-          <View style={styles.teamTotals}>
+        {showTeamTotals ? (
+          <View style={[styles.teamTotals, compact && styles.teamTotalsCompact]}>
             <View style={styles.teamTotalBox}>
               <Text style={styles.teamTotalLabel} numberOfLines={1}>
-                {model.teamNames[0]}
+                {model.teamNames![0]}
               </Text>
-              <Text style={styles.teamTotalScore}>{model.teamTotals[0]}</Text>
+              <Text
+                style={[
+                  styles.teamTotalScore,
+                  compact && styles.teamTotalScoreCompact,
+                ]}
+              >
+                {model.teamTotals![0]}
+              </Text>
             </View>
             <View style={styles.teamTotalGold} />
             <View style={styles.teamTotalBox}>
               <Text style={styles.teamTotalLabel} numberOfLines={1}>
-                {model.teamNames[1]}
+                {model.teamNames![1]}
               </Text>
-              <Text style={styles.teamTotalScore}>{model.teamTotals[1]}</Text>
+              <Text
+                style={[
+                  styles.teamTotalScore,
+                  compact && styles.teamTotalScoreCompact,
+                ]}
+              >
+                {model.teamTotals![1]}
+              </Text>
             </View>
           </View>
         ) : null}
@@ -206,19 +235,19 @@ const styles = StyleSheet.create({
   frame: {
     flex: 1,
     minHeight: 0,
-    backgroundColor: sheet.cream,
+    backgroundColor: colors.cream,
     borderWidth: 1.5,
-    borderColor: sheet.gold,
-    borderRadius: 4,
+    borderColor: colors.gold,
+    borderRadius: radii.sm,
     overflow: 'hidden',
   },
   stickyHeader: {
     borderBottomWidth: 1.5,
-    borderBottomColor: sheet.gold,
+    borderBottomColor: colors.gold,
   },
   stickyFooter: {
     borderTopWidth: 1.5,
-    borderTopColor: sheet.gold,
+    borderTopColor: colors.gold,
   },
   bodyScroll: {
     flex: 1,
@@ -230,38 +259,50 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    height: ROW_HEIGHT,
+    height: layout.tableRowHeight,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: sheet.line,
+    borderBottomColor: colors.line,
+  },
+  rowCompact: {
+    height: layout.tableRowHeight - 4,
   },
   headerRow: {
-    height: HEADER_HEIGHT,
-    backgroundColor: sheet.creamHeader,
+    height: layout.tableHeaderHeight,
+    backgroundColor: colors.creamHeader,
     borderBottomWidth: 0,
+  },
+  headerRowCompact: {
+    height: layout.tableHeaderHeight - 2,
   },
   penaltyRow: {
-    backgroundColor: sheet.penalty,
+    backgroundColor: colors.penalty,
   },
   totalRow: {
-    height: TOTAL_HEIGHT,
-    backgroundColor: sheet.creamTotal,
+    height: layout.tableTotalHeight,
+    backgroundColor: colors.creamTotal,
     borderBottomWidth: 0,
   },
+  totalRowCompact: {
+    height: layout.tableTotalHeight - 4,
+  },
   labelCell: {
-    width: LABEL_WIDTH,
+    width: layout.tableLabelWidth,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 2,
+    paddingHorizontal: 1,
+  },
+  labelCellCompact: {
+    width: layout.tableLabelWidth - 4,
   },
   valueCell: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 2,
+    paddingHorizontal: 1,
   },
   gridBorder: {
     borderRightWidth: StyleSheet.hairlineWidth,
-    borderRightColor: sheet.goldSoft,
+    borderRightColor: colors.goldSoft,
   },
   gridBorderLast: {
     borderRightWidth: 0,
@@ -269,91 +310,117 @@ const styles = StyleSheet.create({
   labelText: {
     fontSize: 12,
     fontWeight: '700',
-    color: sheet.text,
+    color: colors.text,
     textAlign: 'center',
+  },
+  labelTextCompact: {
+    fontSize: 11,
   },
   headerText: {
     fontSize: 11,
     fontWeight: '800',
-    color: sheet.green,
+    color: colors.green,
     textAlign: 'center',
   },
   totalLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
-    letterSpacing: 0.6,
-    color: sheet.green,
+    letterSpacing: 0.4,
+    color: colors.green,
+  },
+  penaltyLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.green,
   },
   penaltyDetail: {
-    fontSize: 8,
+    fontSize: 7,
     fontWeight: '600',
-    color: sheet.textMuted,
+    color: colors.textMuted,
     textAlign: 'center',
-    marginTop: 1,
   },
   cellValue: {
     fontSize: 13,
     fontWeight: '600',
-    color: sheet.text,
+    color: colors.text,
     textAlign: 'center',
+  },
+  cellValueCompact: {
+    fontSize: 12,
   },
   headerCellValue: {
     fontSize: 11,
     fontWeight: '800',
-    color: sheet.green,
+    color: colors.green,
+  },
+  headerCellValueCompact: {
+    fontSize: 10,
   },
   cellTotal: {
     fontSize: 15,
     fontWeight: '900',
-    color: sheet.green,
+    color: colors.green,
+  },
+  cellTotalCompact: {
+    fontSize: 14,
   },
   cellEmphasize: {
     fontWeight: '800',
-    color: sheet.green,
+    color: colors.green,
   },
   dash: {
     fontSize: 13,
-    color: sheet.textMuted,
+    color: colors.textMuted,
+  },
+  dashCompact: {
+    fontSize: 12,
   },
   empty: {
     fontSize: 13,
     fontWeight: '600',
-    color: sheet.textMuted,
+    color: colors.textMuted,
     textAlign: 'center',
-    paddingVertical: 28,
+    paddingVertical: 24,
   },
   teamTotals: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    backgroundColor: sheet.white,
-    minHeight: 58,
+    backgroundColor: colors.creamCard,
+    minHeight: 54,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: sheet.goldSoft,
+    borderTopColor: colors.goldSoft,
+  },
+  teamTotalsCompact: {
+    minHeight: 48,
   },
   teamTotalBox: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    gap: 2,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    gap: 1,
   },
   teamTotalGold: {
     width: 1.5,
-    backgroundColor: sheet.gold,
+    backgroundColor: colors.gold,
   },
   teamTotalLabel: {
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
     textTransform: 'uppercase',
-    color: sheet.textMuted,
+    color: colors.textMuted,
     textAlign: 'center',
   },
   teamTotalScore: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '900',
-    lineHeight: 28,
-    color: sheet.green,
+    lineHeight: 26,
+    color: colors.green,
+  },
+  teamTotalScoreCompact: {
+    fontSize: 20,
+    lineHeight: 24,
   },
 });

@@ -30,18 +30,7 @@ import {
   TargetRoundCountOption,
 } from '../targetRoundCount';
 import { ActiveGameData } from './ActiveGameScreen';
-
-const ui = {
-  green: '#1F5E3B',
-  cream: '#F7F2E8',
-  creamCard: '#FFFEF9',
-  gold: '#C8A44D',
-  goldSoft: 'rgba(200, 164, 77, 0.55)',
-  white: '#FFFFFF',
-  text: '#263238',
-  textMuted: '#6B736C',
-  border: '#D4CBB8',
-} as const;
+import { colors as ui, layout, radii, spacing } from '../theme';
 
 type NewGameScreenProps = {
   onBack: () => void;
@@ -643,7 +632,7 @@ const styles = StyleSheet.create({
     color: ui.textMuted,
   },
   fieldInput: {
-    height: 34,
+    height: layout.inputHeight,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: ui.border,
@@ -759,7 +748,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   primaryButton: {
-    minHeight: 50,
+    minHeight: layout.buttonHeight,
     borderRadius: 12,
     backgroundColor: ui.green,
     borderWidth: 1.5,
@@ -776,7 +765,7 @@ const styles = StyleSheet.create({
     color: ui.white,
   },
   cancelButton: {
-    minHeight: 36,
+    minHeight: layout.buttonHeight,
     alignItems: 'center',
     justifyContent: 'center',
   },

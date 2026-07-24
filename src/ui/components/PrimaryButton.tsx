@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
 
-import { colors, radii, spacing, typography } from '../theme';
+import { chrome, colors, layout, radii, spacing } from '../theme';
 
 type PrimaryButtonProps = {
   label: string;
@@ -22,40 +22,21 @@ export function PrimaryButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        pressed && !disabled && styles.pressed,
-        disabled && styles.disabled,
+        pressed && !disabled && chrome.pressed,
+        disabled && chrome.disabled,
         style,
       ]}
     >
-      <Text style={[styles.label, disabled && styles.labelDisabled]}>
-        {label}
-      </Text>
+      <Text style={chrome.buttonPrimaryLabel}>{label}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 52,
+    ...chrome.buttonPrimary,
+    minHeight: layout.buttonHeight,
     borderRadius: radii.md,
-    backgroundColor: colors.primary,
-    borderWidth: 1,
-    borderColor: colors.goldMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-  pressed: {
-    backgroundColor: colors.primaryPressed,
-  },
-  disabled: {
-    opacity: 0.4,
-  },
-  label: {
-    ...typography.button,
-    color: colors.textOnPrimary,
-  },
-  labelDisabled: {
-    color: colors.textOnPrimary,
+    paddingHorizontal: spacing.md,
   },
 });

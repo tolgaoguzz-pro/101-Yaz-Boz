@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
 
-import { colors, radii, spacing, typography } from '../theme';
+import { chrome, colors, layout, radii, spacing } from '../theme';
 
 type SecondaryButtonProps = {
   label: string;
@@ -22,12 +22,17 @@ export function SecondaryButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        pressed && !disabled && styles.pressed,
-        disabled && styles.disabled,
+        pressed && !disabled && chrome.pressed,
+        disabled && chrome.disabled,
         style,
       ]}
     >
-      <Text style={[styles.label, disabled && styles.labelDisabled]}>
+      <Text
+        style={[
+          chrome.buttonSecondaryLabel,
+          disabled && { color: colors.textMuted },
+        ]}
+      >
         {label}
       </Text>
     </Pressable>
@@ -36,27 +41,9 @@ export function SecondaryButton({
 
 const styles = StyleSheet.create({
   button: {
-    flexGrow: 0,
-    minHeight: 48,
+    ...chrome.buttonSecondary,
+    minHeight: layout.buttonHeight,
     borderRadius: radii.md,
-    backgroundColor: colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: colors.gold,
-    alignItems: 'center',
-    justifyContent: 'center',
     paddingHorizontal: spacing.md,
-  },
-  pressed: {
-    backgroundColor: colors.surface,
-  },
-  disabled: {
-    opacity: 0.4,
-  },
-  label: {
-    ...typography.buttonSecondary,
-    color: colors.primary,
-  },
-  labelDisabled: {
-    color: colors.textSecondary,
   },
 });
