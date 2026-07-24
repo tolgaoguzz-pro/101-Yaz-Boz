@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -6,6 +6,7 @@ import {
   Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -107,6 +108,7 @@ function PlayerEntryRow({
   onSetOpenKind,
   onChangeTiles,
   onBlurTiles,
+  onFocusTiles,
 }: {
   playerName: string;
   playerForm: RoundEntryPlayerForm;
@@ -115,6 +117,7 @@ function PlayerEntryRow({
   onSetOpenKind: (kind: 'series' | 'doubles') => void;
   onChangeTiles: (value: string) => void;
   onBlurTiles: () => void;
+  onFocusTiles: () => void;
 }) {
   const opened = playerForm.openType !== 'didNotOpen';
 
@@ -172,6 +175,7 @@ function PlayerEntryRow({
             selectTextOnFocus
             onChangeText={onChangeTiles}
             onBlur={onBlurTiles}
+            onFocus={onFocusTiles}
             placeholderTextColor={ui.textMuted}
             style={styles.tileInput}
           />
@@ -190,6 +194,8 @@ export function RoundEntryScreen({
 }: RoundEntryScreenProps) {
   const { height } = useWindowDimensions();
   const compact = height < 700;
+  const scrollRef = useRef<ScrollView>(null);
+  const tableOffsetRef = useRef(0);
 
   const rosterPlayers = useMemo(() => playersFromActiveGame(game), [game]);
   const isIndividual = resolveGameMode(game.gameMode) === 'individual';
@@ -203,7 +209,25 @@ export function RoundEntryScreen({
     useState<RoundPreviewState>(CLOSED_ROUND_PREVIEW);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const savingLock = useRef(false);
+
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent =
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => {
+      setKeyboardVisible(true);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardVisible(false);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const finishOptionsDisabled = form.finisherPlayerId === null;
   const visiblePlayerIds = getVisiblePlayerIds(form);
@@ -284,6 +308,17 @@ export function RoundEntryScreen({
     updatePlayer(playerId, { openType });
   }
 
+  function scrollRowIntoView(rowIndex: number) {
+    const y =
+      tableOffsetRef.current + HEADER_ROW_HEIGHT + rowIndex * ROW_HEIGHT - 12;
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({
+        y: Math.max(0, y),
+        animated: true,
+      });
+    });
+  }
+
   function commitSave(result: CalculateRoundResult, meta: RoundSaveMeta) {
     if (savingLock.current || saving) {
       return;
@@ -354,8 +389,8 @@ export function RoundEntryScreen({
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}
       >
         <View style={[styles.header, compact && styles.headerCompact]}>
           <Pressable
@@ -380,225 +415,255 @@ export function RoundEntryScreen({
           <View style={styles.backSpacer} />
         </View>
 
-        <View style={[styles.body, compact && styles.bodyCompact]}>
-          <View style={styles.teamBlocks}>
-            <View style={styles.teamBlock}>
-              <Text style={styles.teamHeading} numberOfLines={1}>
-                {leftHeading}
-              </Text>
-              {team1Players.map((player) => {
-                const selected = form.finisherPlayerId === player.id;
-                return (
-                  <Pressable
-                    key={player.id}
-                    accessibilityRole="button"
-                    onPress={() => selectFinisher(player.id)}
-                    style={({ pressed }) => [
-                      styles.finisherButton,
-                      compact && styles.finisherButtonCompact,
-                      selected && styles.finisherSelected,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.finisherLabel,
-                        selected && styles.finisherLabelSelected,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {player.name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <View style={styles.teamDivider} />
-
-            <View style={styles.teamBlock}>
-              <Text style={styles.teamHeading} numberOfLines={1}>
-                {rightHeading}
-              </Text>
-              {team2Players.map((player) => {
-                const selected = form.finisherPlayerId === player.id;
-                return (
-                  <Pressable
-                    key={player.id}
-                    accessibilityRole="button"
-                    onPress={() => selectFinisher(player.id)}
-                    style={({ pressed }) => [
-                      styles.finisherButton,
-                      compact && styles.finisherButtonCompact,
-                      selected && styles.finisherSelected,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.finisherLabel,
-                        selected && styles.finisherLabelSelected,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {player.name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          <Text style={styles.sectionTitle}>BİTİŞ TÜRÜ</Text>
-          <View style={styles.finishSegment}>
-            {FINISH_OPTIONS.map((option, index) => {
-              const isNoneOption = option.value === 'none';
-              const disabled = finishOptionsDisabled
-                ? !isNoneOption
-                : isNoneOption;
-              const selected = form.finishType === option.value;
-              const isLast = index === FINISH_OPTIONS.length - 1;
-
-              return (
-                <Pressable
-                  key={option.value}
-                  accessibilityRole="button"
-                  disabled={disabled}
-                  onPress={() => onFinishSegmentPress(option.value)}
-                  style={({ pressed }) => [
-                    styles.finishSegmentItem,
-                    !isLast && styles.finishSegmentDivider,
-                    selected && styles.finishSegmentSelected,
-                    disabled && styles.finishSegmentDisabled,
-                    pressed && !disabled && styles.pressed,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.finishSegmentLabel,
-                      compact && styles.finishSegmentLabelCompact,
-                      selected && styles.finishSegmentLabelSelected,
-                      disabled && styles.finishSegmentLabelDisabled,
-                    ]}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.75}
-                  >
-                    {option.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          {showHandAutoNote ? (
-            <View style={styles.handNote}>
-              <View style={styles.handNoteBox}>
-                <Text style={styles.handNoteText}>
-                  Diğer oyuncular açmamış sayılacaktır.
+        <ScrollView
+          ref={scrollRef}
+          style={styles.bodyScroll}
+          contentContainerStyle={[
+            styles.bodyContent,
+            compact && styles.bodyContentCompact,
+            keyboardVisible && styles.bodyContentKeyboard,
+          ]}
+          keyboardShouldPersistTaps="always"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+          bounces={keyboardVisible}
+        >
+          <Pressable
+            accessible={false}
+            onPress={Keyboard.dismiss}
+            style={styles.bodyPressable}
+          >
+            <View style={styles.teamBlocks}>
+              <View style={styles.teamBlock}>
+                <Text style={styles.teamHeading} numberOfLines={1}>
+                  {leftHeading}
                 </Text>
+                {team1Players.map((player) => {
+                  const selected = form.finisherPlayerId === player.id;
+                  return (
+                    <Pressable
+                      key={player.id}
+                      accessibilityRole="button"
+                      onPress={() => selectFinisher(player.id)}
+                      style={({ pressed }) => [
+                        styles.finisherButton,
+                        compact && styles.finisherButtonCompact,
+                        selected && styles.finisherSelected,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.finisherLabel,
+                          selected && styles.finisherLabelSelected,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {player.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <View style={styles.teamDivider} />
+
+              <View style={styles.teamBlock}>
+                <Text style={styles.teamHeading} numberOfLines={1}>
+                  {rightHeading}
+                </Text>
+                {team2Players.map((player) => {
+                  const selected = form.finisherPlayerId === player.id;
+                  return (
+                    <Pressable
+                      key={player.id}
+                      accessibilityRole="button"
+                      onPress={() => selectFinisher(player.id)}
+                      style={({ pressed }) => [
+                        styles.finisherButton,
+                        compact && styles.finisherButtonCompact,
+                        selected && styles.finisherSelected,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.finisherLabel,
+                          selected && styles.finisherLabelSelected,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {player.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
             </View>
-          ) : null}
 
-          {showPlayerTable ? (
-            <View style={styles.entryTable}>
-              <View style={styles.entryHeader}>
-                <View style={[styles.colPlayer, styles.gridCell]}>
-                  <Text style={styles.headerCell}>Oyuncu</Text>
-                </View>
-                <View style={[styles.colDurum, styles.gridCell]}>
-                  <Text style={styles.headerCell}>Durum</Text>
-                </View>
-                <View style={[styles.colAcilis, styles.gridCell]}>
-                  <Text style={styles.headerCell}>Açılış</Text>
-                </View>
-                <View
-                  style={[styles.colKalan, styles.gridCell, styles.gridCellLast]}
-                >
-                  <Text style={styles.headerCell}>Kalan</Text>
-                </View>
-              </View>
-              {visiblePlayerIds.map((playerId) => {
-                const playerForm = form.players.find(
-                  (p) => p.playerId === playerId,
-                );
-                const playerName = nameByPlayerId.get(playerId);
-                if (!playerForm || !playerName) {
-                  return null;
-                }
-                const mode = getPlayerCardMode(form, playerId);
+            <Text style={styles.sectionTitle}>BİTİŞ TÜRÜ</Text>
+            <View style={styles.finishSegment}>
+              {FINISH_OPTIONS.map((option, index) => {
+                const isNoneOption = option.value === 'none';
+                const disabled = finishOptionsDisabled
+                  ? !isNoneOption
+                  : isNoneOption;
+                const selected = form.finishType === option.value;
+                const isLast = index === FINISH_OPTIONS.length - 1;
+
                 return (
-                  <PlayerEntryRow
-                    key={playerId}
-                    playerName={playerName}
-                    playerForm={playerForm}
-                    mode={mode}
-                    onSetOpened={(opened) => setOpened(playerId, opened)}
-                    onSetOpenKind={(kind) => setOpenKind(playerId, kind)}
-                    onChangeTiles={(value) =>
-                      updatePlayer(playerId, {
-                        remainingTilePointsText: value,
-                      })
-                    }
-                    onBlurTiles={() =>
-                      updatePlayer(playerId, {
-                        remainingTilePointsText: String(
-                          parseNonNegativeNumber(
-                            playerForm.remainingTilePointsText,
-                          ),
-                        ),
-                      })
-                    }
-                  />
+                  <Pressable
+                    key={option.value}
+                    accessibilityRole="button"
+                    disabled={disabled}
+                    onPress={() => onFinishSegmentPress(option.value)}
+                    style={({ pressed }) => [
+                      styles.finishSegmentItem,
+                      !isLast && styles.finishSegmentDivider,
+                      selected && styles.finishSegmentSelected,
+                      disabled && styles.finishSegmentDisabled,
+                      pressed && !disabled && styles.pressed,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.finishSegmentLabel,
+                        compact && styles.finishSegmentLabelCompact,
+                        selected && styles.finishSegmentLabelSelected,
+                        disabled && styles.finishSegmentLabelDisabled,
+                      ]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.75}
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
                 );
               })}
             </View>
-          ) : null}
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-        </View>
+            {showHandAutoNote ? (
+              <View style={styles.handNote}>
+                <View style={styles.handNoteBox}>
+                  <Text style={styles.handNoteText}>
+                    Diğer oyuncular açmamış sayılacaktır.
+                  </Text>
+                </View>
+              </View>
+            ) : null}
 
-        <View style={[styles.footer, compact && styles.footerCompact]}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={handleDirectSave}
-            disabled={saving}
-            style={({ pressed }) => [
-              styles.primaryButton,
-              compact && styles.footerButtonCompact,
-              pressed && !saving && styles.pressed,
-              saving && styles.disabled,
-            ]}
-          >
-            <Text style={styles.primaryLabel}>ELİ KAYDET</Text>
+            {showPlayerTable ? (
+              <View
+                style={styles.entryTable}
+                onLayout={(event) => {
+                  tableOffsetRef.current = event.nativeEvent.layout.y;
+                }}
+              >
+                <View style={styles.entryHeader}>
+                  <View style={[styles.colPlayer, styles.gridCell]}>
+                    <Text style={styles.headerCell}>Oyuncu</Text>
+                  </View>
+                  <View style={[styles.colDurum, styles.gridCell]}>
+                    <Text style={styles.headerCell}>Durum</Text>
+                  </View>
+                  <View style={[styles.colAcilis, styles.gridCell]}>
+                    <Text style={styles.headerCell}>Açılış</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.colKalan,
+                      styles.gridCell,
+                      styles.gridCellLast,
+                    ]}
+                  >
+                    <Text style={styles.headerCell}>Kalan</Text>
+                  </View>
+                </View>
+                {visiblePlayerIds.map((playerId, rowIndex) => {
+                  const playerForm = form.players.find(
+                    (p) => p.playerId === playerId,
+                  );
+                  const playerName = nameByPlayerId.get(playerId);
+                  if (!playerForm || !playerName) {
+                    return null;
+                  }
+                  const mode = getPlayerCardMode(form, playerId);
+                  return (
+                    <PlayerEntryRow
+                      key={playerId}
+                      playerName={playerName}
+                      playerForm={playerForm}
+                      mode={mode}
+                      onSetOpened={(opened) => setOpened(playerId, opened)}
+                      onSetOpenKind={(kind) => setOpenKind(playerId, kind)}
+                      onChangeTiles={(value) =>
+                        updatePlayer(playerId, {
+                          remainingTilePointsText: value,
+                        })
+                      }
+                      onBlurTiles={() =>
+                        updatePlayer(playerId, {
+                          remainingTilePointsText: String(
+                            parseNonNegativeNumber(
+                              playerForm.remainingTilePointsText,
+                            ),
+                          ),
+                        })
+                      }
+                      onFocusTiles={() => scrollRowIntoView(rowIndex)}
+                    />
+                  );
+                })}
+              </View>
+            ) : null}
+
+            {error ? <Text style={styles.error}>{error}</Text> : null}
           </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={handlePreview}
-            disabled={saving}
-            style={({ pressed }) => [
-              styles.secondaryButton,
-              compact && styles.footerButtonCompact,
-              pressed && !saving && styles.pressed,
-              saving && styles.disabled,
-            ]}
-          >
-            <Text style={styles.secondaryLabel}>ÖNİZLE</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={onBack}
-            disabled={saving}
-            style={({ pressed }) => [
-              styles.cancelButton,
-              compact && styles.footerButtonCompact,
-              pressed && !saving && styles.pressed,
-            ]}
-          >
-            <Text style={styles.cancelLabel}>İPTAL</Text>
-          </Pressable>
-        </View>
+        </ScrollView>
+
+        {!keyboardVisible ? (
+          <View style={[styles.footer, compact && styles.footerCompact]}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={handleDirectSave}
+              disabled={saving}
+              style={({ pressed }) => [
+                styles.primaryButton,
+                compact && styles.footerButtonCompact,
+                pressed && !saving && styles.pressed,
+                saving && styles.disabled,
+              ]}
+            >
+              <Text style={styles.primaryLabel}>ELİ KAYDET</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={handlePreview}
+              disabled={saving}
+              style={({ pressed }) => [
+                styles.secondaryButton,
+                compact && styles.footerButtonCompact,
+                pressed && !saving && styles.pressed,
+                saving && styles.disabled,
+              ]}
+            >
+              <Text style={styles.secondaryLabel}>ÖNİZLE</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onBack}
+              disabled={saving}
+              style={({ pressed }) => [
+                styles.cancelButton,
+                compact && styles.footerButtonCompact,
+                pressed && !saving && styles.pressed,
+              ]}
+            >
+              <Text style={styles.cancelLabel}>İPTAL</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </KeyboardAvoidingView>
 
       <Modal
@@ -673,19 +738,29 @@ const styles = StyleSheet.create({
     color: ui.headerMuted,
     marginTop: 1,
   },
-  body: {
+  bodyScroll: {
     flex: 1,
     minHeight: 0,
     backgroundColor: ui.cream,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+  },
+  bodyContent: {
+    flexGrow: 1,
     paddingHorizontal: 12,
     paddingTop: 12,
+    paddingBottom: 12,
     gap: 10,
   },
-  bodyCompact: {
+  bodyContentCompact: {
     paddingTop: 8,
     gap: 7,
+  },
+  bodyContentKeyboard: {
+    paddingBottom: 24,
+  },
+  bodyPressable: {
+    gap: 10,
   },
   teamBlocks: {
     flexDirection: 'row',
@@ -786,11 +861,11 @@ const styles = StyleSheet.create({
     color: ui.textMuted,
   },
   handNote: {
-    flex: 1,
-    minHeight: 0,
+    minHeight: 120,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 8,
+    paddingVertical: 16,
   },
   handNoteBox: {
     width: '100%',

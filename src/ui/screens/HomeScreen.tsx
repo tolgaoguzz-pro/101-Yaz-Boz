@@ -5,6 +5,7 @@ import {
   SafeAreaView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
@@ -14,18 +15,21 @@ import { resolveGameStatus } from '../gameLifecycle';
 import { resolveTargetRoundCount } from '../targetRoundCount';
 import { ActiveGameData } from './ActiveGameScreen';
 
-/** Referans ANA EKRAN paleti (yalnızca bu ekran). */
+/** Referans ANA EKRAN paleti. */
 const home = {
   felt: '#1F5E3B',
   feltDeep: '#174A2E',
   feltLight: '#2A6E47',
   cream: '#F7F2E8',
   gold: '#C8A44D',
+  goldSoft: '#D4B56A',
   text: '#263238',
-  textMuted: '#7A847C',
+  textMuted: '#6B736C',
   divider: '#E2DCD0',
   white: '#FFFFFF',
-  iconMuted: '#4A5560',
+  tileFace: '#FFFEF8',
+  tileRed: '#C62828',
+  tileBlack: '#1A1A1A',
 } as const;
 
 type HomeScreenProps = {
@@ -68,10 +72,20 @@ function MenuRow({
           pressed && !disabled && styles.menuRowPressed,
         ]}
       >
-        <View style={styles.menuIconSlot}>{icon}</View>
+        <View style={[styles.menuIconSlot, disabled && styles.menuIconMuted]}>
+          {icon}
+        </View>
         <View style={styles.menuText}>
-          <Text style={styles.menuTitle}>{title}</Text>
-          <Text style={styles.menuSubtitle} numberOfLines={1}>
+          <Text style={[styles.menuTitle, disabled && styles.menuTitleDisabled]}>
+            {title}
+          </Text>
+          <Text
+            style={[
+              styles.menuSubtitle,
+              disabled && styles.menuSubtitleDisabled,
+            ]}
+            numberOfLines={1}
+          >
             {subtitle}
           </Text>
         </View>
@@ -81,20 +95,51 @@ function MenuRow({
   );
 }
 
+/** Referanstaki 101 taş motifi — yalnız RN View/Text. */
+function LogoTiles() {
+  return (
+    <View style={styles.tileRow}>
+      <View style={styles.tile}>
+        <Text style={[styles.tileDigit, styles.tileDigitRed]}>1</Text>
+      </View>
+      <View style={styles.tile}>
+        <Text style={[styles.tileDigit, styles.tileDigitBlack]}>0</Text>
+      </View>
+      <View style={styles.tile}>
+        <Text style={[styles.tileDigit, styles.tileDigitRed]}>1</Text>
+      </View>
+    </View>
+  );
+}
+
 function PlayIcon() {
-  return <Text style={styles.iconPlay}>▶</Text>;
+  return (
+    <View style={styles.playBadge}>
+      <Text style={styles.iconPlay}>▶</Text>
+    </View>
+  );
 }
 
 function TrophyIcon() {
-  return <Text style={styles.iconTrophy}>♔</Text>;
+  return <Text style={styles.iconGold}>♔</Text>;
 }
 
 function PlusIcon() {
-  return <Text style={styles.iconMuted}>＋</Text>;
+  return (
+    <View style={styles.plusBadge}>
+      <Text style={styles.iconPlus}>＋</Text>
+    </View>
+  );
 }
 
 function StatsIcon() {
-  return <Text style={styles.iconMuted}>▮▮▮</Text>;
+  return (
+    <View style={styles.statsBars}>
+      <View style={[styles.statsBar, styles.statsBarShort]} />
+      <View style={[styles.statsBar, styles.statsBarMid]} />
+      <View style={[styles.statsBar, styles.statsBarTall]} />
+    </View>
+  );
 }
 
 function InfoIcon() {
@@ -115,6 +160,9 @@ export function HomeScreen({
   onStats,
   onAbout,
 }: HomeScreenProps) {
+  const { height } = useWindowDimensions();
+  const compact = height < 700;
+
   function handleNewGame() {
     if (!activeGame) {
       onNewGame();
@@ -180,18 +228,18 @@ export function HomeScreen({
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.felt}>
+      <View style={[styles.felt, compact && styles.feltCompact]}>
         <View style={styles.feltTextureA} />
         <View style={styles.feltTextureB} />
-        <View style={styles.feltTextureC} />
-
         <View style={styles.logoBlock}>
-          <Text style={styles.logo101}>101</Text>
-          <Text style={styles.logoYazBoz}>YAZ-BOZ</Text>
+          <LogoTiles />
+          <Text style={[styles.logoWordmark, compact && styles.logoWordmarkCompact]}>
+            101 YAZ-BOZ
+          </Text>
         </View>
       </View>
 
-      <View style={styles.sheet}>
+      <View style={[styles.sheet, compact && styles.sheetCompact]}>
         <View style={styles.menuList}>
           {activeGame ? (
             <View>
@@ -291,112 +339,151 @@ const styles = StyleSheet.create({
     backgroundColor: home.felt,
   },
   felt: {
-    height: '28%',
-    minHeight: 160,
-    maxHeight: 220,
+    height: '22%',
+    minHeight: 128,
+    maxHeight: 176,
     backgroundColor: home.felt,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+    paddingBottom: 6,
+  },
+  feltCompact: {
+    height: '18%',
+    minHeight: 112,
+    maxHeight: 140,
   },
   feltTextureA: {
     position: 'absolute',
-    top: -40,
-    left: -30,
-    width: 180,
-    height: 180,
-    borderRadius: 90,
+    top: -36,
+    left: -28,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
     backgroundColor: home.feltLight,
-    opacity: 0.18,
+    opacity: 0.2,
   },
   feltTextureB: {
     position: 'absolute',
-    bottom: -50,
-    right: -20,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    bottom: -44,
+    right: -24,
+    width: 170,
+    height: 170,
+    borderRadius: 85,
     backgroundColor: home.feltDeep,
-    opacity: 0.35,
-  },
-  feltTextureC: {
-    position: 'absolute',
-    top: 24,
-    right: 40,
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: home.feltLight,
-    opacity: 0.12,
+    opacity: 0.38,
   },
   logoBlock: {
     alignItems: 'center',
-    gap: 2,
+    gap: 8,
   },
-  logo101: {
-    fontSize: 56,
+  tileRow: {
+    flexDirection: 'row',
+    gap: 7,
+  },
+  tile: {
+    width: 36,
+    height: 48,
+    borderRadius: 5,
+    backgroundColor: home.tileFace,
+    borderWidth: 1.5,
+    borderColor: home.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
+  },
+  tileDigit: {
+    fontSize: 22,
     fontWeight: '800',
-    lineHeight: 60,
-    color: home.gold,
-    letterSpacing: 1,
+    lineHeight: 26,
   },
-  logoYazBoz: {
-    fontSize: 16,
-    fontWeight: '700',
-    lineHeight: 20,
+  tileDigitRed: {
+    color: home.tileRed,
+  },
+  tileDigitBlack: {
+    color: home.tileBlack,
+  },
+  logoWordmark: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 2.5,
     color: home.gold,
-    letterSpacing: 6,
+  },
+  logoWordmarkCompact: {
+    fontSize: 19,
+    letterSpacing: 2,
   },
   sheet: {
     flex: 1,
     backgroundColor: home.cream,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingTop: 18,
-    paddingHorizontal: 24,
-    paddingBottom: 12,
+    paddingTop: 14,
+    paddingHorizontal: 22,
+    paddingBottom: 10,
     justifyContent: 'space-between',
+  },
+  sheetCompact: {
+    paddingTop: 10,
+    paddingHorizontal: 18,
   },
   menuList: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 4,
   },
   menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 64,
-    paddingVertical: 10,
+    height: 58,
+    paddingVertical: 0,
     gap: 14,
   },
   continueRow: {
     alignItems: 'flex-start',
-    minHeight: 64,
+    height: undefined,
+    minHeight: 58,
+    paddingVertical: 10,
   },
   menuRowPressed: {
     opacity: 0.72,
   },
   menuRowDisabled: {
-    opacity: 0.45,
+    opacity: 0.72,
   },
   menuIconSlot: {
-    width: 28,
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  menuIconMuted: {
+    opacity: 0.75,
   },
   menuText: {
     flex: 1,
     gap: 2,
   },
   menuTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
-    lineHeight: 22,
+    lineHeight: 21,
+    color: home.text,
+  },
+  menuTitleDisabled: {
     color: home.text,
   },
   menuSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '400',
-    lineHeight: 18,
+    lineHeight: 16,
+    color: home.textMuted,
+  },
+  menuSubtitleDisabled: {
     color: home.textMuted,
   },
   pausedBadge: {
@@ -441,46 +528,87 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     backgroundColor: home.divider,
   },
-  iconPlay: {
-    fontSize: 16,
-    color: home.felt,
+  playBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1.5,
+    borderColor: home.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: home.white,
   },
-  iconTrophy: {
-    fontSize: 18,
+  iconPlay: {
+    fontSize: 11,
+    color: home.felt,
+    marginLeft: 1,
+  },
+  iconGold: {
+    fontSize: 20,
     color: home.gold,
   },
-  iconMuted: {
-    fontSize: 18,
+  plusBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1.5,
+    borderColor: home.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconPlus: {
+    fontSize: 16,
     fontWeight: '600',
-    color: home.iconMuted,
+    color: home.gold,
+    marginTop: -1,
+  },
+  statsBars: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 3,
+    height: 20,
+  },
+  statsBar: {
+    width: 4,
+    borderRadius: 1,
+    backgroundColor: home.gold,
+  },
+  statsBarShort: {
+    height: 9,
+  },
+  statsBarMid: {
+    height: 14,
+  },
+  statsBarTall: {
+    height: 20,
   },
   infoBadge: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     borderWidth: 1.5,
-    borderColor: home.iconMuted,
+    borderColor: home.gold,
     alignItems: 'center',
     justifyContent: 'center',
   },
   infoBadgeText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
-    color: home.iconMuted,
+    color: home.gold,
     marginTop: -1,
   },
   footer: {
     alignItems: 'center',
-    gap: 4,
-    paddingTop: 8,
-    paddingBottom: 4,
+    gap: 3,
+    paddingTop: 6,
+    paddingBottom: 2,
   },
   club: {
-    fontSize: 16,
+    fontSize: 14,
     color: home.gold,
   },
   credit: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '500',
     color: home.textMuted,
   },
