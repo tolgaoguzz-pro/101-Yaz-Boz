@@ -4,6 +4,7 @@ import {
   SafeAreaView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useMemo, useState } from 'react';
@@ -88,26 +89,6 @@ type ActiveGameScreenProps = {
   onAbandon: () => void;
 };
 
-type FooterButtonProps = {
-  label: string;
-  onPress: () => void;
-};
-
-function FooterButton({ label, onPress }: FooterButtonProps) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.footerButton,
-        pressed && styles.footerButtonPressed,
-      ]}
-    >
-      <Text style={styles.footerButtonLabel}>{label}</Text>
-    </Pressable>
-  );
-}
-
 export function ActiveGameScreen({
   game,
   onHome,
@@ -117,6 +98,8 @@ export function ActiveGameScreen({
   onFinishEarly,
   onAbandon,
 }: ActiveGameScreenProps) {
+  const { height } = useWindowDimensions();
+  const compact = height < 700;
   const isIndividual = resolveGameMode(game.gameMode) === 'individual';
   const playedRounds = game.rounds.length;
   const targetRounds = resolveTargetRoundCount(game.targetRoundCount);
@@ -148,36 +131,28 @@ export function ActiveGameScreen({
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
+      <View style={[styles.header, compact && styles.headerCompact]}>
         <View style={styles.topBar}>
           <Pressable
             accessibilityRole="button"
             onPress={onHome}
             hitSlop={8}
             style={({ pressed }) => [
-              styles.backButton,
-              pressed && styles.backPressed,
+              styles.iconButton,
+              pressed && styles.pressed,
             ]}
           >
             <Text style={styles.backLabel}>‹</Text>
           </Pressable>
           <View style={styles.titleBlock}>
-            <Text style={styles.title}>Aktif Oyun</Text>
+            <Text style={[styles.title, compact && styles.titleCompact]}>
+              Aktif Oyun
+            </Text>
             <Text style={styles.roundInfo}>
               El {playedRounds}/{targetRounds} · Kalan {roundsLeft}
             </Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setActionsOpen(true)}
-            hitSlop={8}
-            style={({ pressed }) => [
-              styles.menuButton,
-              pressed && styles.backPressed,
-            ]}
-          >
-            <Text style={styles.menuDots}>⋮</Text>
-          </Pressable>
+          <View style={styles.iconButton} />
         </View>
 
         {isIndividual ? (
@@ -213,17 +188,44 @@ export function ActiveGameScreen({
         )}
       </View>
 
-      <View style={styles.tableArea}>
+      <View style={[styles.tableArea, compact && styles.tableAreaCompact]}>
         <ScoreSheetTable model={model} />
       </View>
 
-      <View style={styles.footer}>
-        <FooterButton label="+ Yeni El" onPress={onNewRound} />
-        <FooterButton label="+ Ceza" onPress={onAddPenalty} />
-        <FooterButton
-          label="≡ İşlemler"
-          onPress={() => setActionsOpen(true)}
-        />
+      <View style={[styles.footer, compact && styles.footerCompact]}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onNewRound}
+          style={({ pressed }) => [
+            styles.primaryButton,
+            compact && styles.primaryButtonCompact,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={styles.primaryLabel}>+ Yeni El</Text>
+        </Pressable>
+        <View style={styles.secondaryRow}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onAddPenalty}
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.secondaryLabel}>Ceza</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setActionsOpen(true)}
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.secondaryLabel}>İşlemler</Text>
+          </Pressable>
+        </View>
       </View>
 
       <GameActionsSheet
@@ -246,27 +248,25 @@ const styles = StyleSheet.create({
     backgroundColor: active.green,
     paddingHorizontal: 12,
     paddingBottom: 10,
-    gap: 10,
+    gap: 8,
+  },
+  headerCompact: {
+    paddingBottom: 6,
+    gap: 6,
   },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 44,
+    minHeight: 40,
   },
-  backButton: {
+  iconButton: {
     width: 40,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  menuButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backPressed: {
-    opacity: 0.7,
+  pressed: {
+    opacity: 0.78,
   },
   backLabel: {
     fontSize: 32,
@@ -274,22 +274,20 @@ const styles = StyleSheet.create({
     color: active.white,
     marginTop: -2,
   },
-  menuDots: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: active.white,
-  },
   titleBlock: {
     flex: 1,
     alignItems: 'center',
   },
   title: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
     color: active.white,
   },
+  titleCompact: {
+    fontSize: 16,
+  },
   roundInfo: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     color: active.textMuted,
     marginTop: 1,
@@ -297,7 +295,6 @@ const styles = StyleSheet.create({
   teamBanner: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    gap: 0,
   },
   teamSide: {
     flex: 1,
@@ -311,15 +308,15 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
   },
   teamName: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
     textTransform: 'uppercase',
     color: active.gold,
     textAlign: 'center',
   },
   playerNames: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     color: active.white,
     textAlign: 'center',
@@ -328,11 +325,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     paddingHorizontal: 4,
   },
   individualPlayer: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: active.white,
     maxWidth: '45%',
@@ -342,36 +339,62 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 0,
     backgroundColor: active.cream,
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 8,
+    paddingHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 6,
+  },
+  tableAreaCompact: {
+    paddingHorizontal: 8,
+    paddingTop: 6,
+    paddingBottom: 4,
   },
   footer: {
     backgroundColor: active.green,
-    flexDirection: 'row',
-    gap: 8,
     paddingHorizontal: 12,
-    paddingTop: 10,
+    paddingTop: 8,
     paddingBottom: 10,
+    gap: 8,
   },
-  footerButton: {
-    flex: 1,
-    minHeight: 48,
+  footerCompact: {
+    paddingTop: 6,
+    paddingBottom: 8,
+    gap: 6,
+  },
+  primaryButton: {
+    minHeight: 52,
     borderRadius: 10,
     backgroundColor: active.greenDeep,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: active.gold,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
   },
-  footerButtonPressed: {
-    opacity: 0.85,
+  primaryButtonCompact: {
+    minHeight: 48,
   },
-  footerButtonLabel: {
-    fontSize: 13,
-    fontWeight: '700',
+  primaryLabel: {
+    fontSize: 17,
+    fontWeight: '800',
     color: active.white,
-    textAlign: 'center',
+    letterSpacing: 0.3,
+  },
+  secondaryRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  secondaryButton: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 10,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(200, 164, 77, 0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: active.textMuted,
   },
 });
