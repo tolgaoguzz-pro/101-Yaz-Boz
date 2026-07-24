@@ -19,6 +19,7 @@ import {
 import {
   finishGameEarly,
   pauseGame,
+  resolveGameStatus,
   restartGame,
   resumeGame,
 } from './src/ui/gameLifecycle';
@@ -141,7 +142,10 @@ export default function App() {
   }
 
   function handleContinue() {
-    if (continuableGame?.status === 'paused') {
+    if (!continuableGame) {
+      return;
+    }
+    if (resolveGameStatus(continuableGame) === 'paused') {
       updateActiveGame((current) => resumeGame(current));
     }
     setScreen('activeGame');

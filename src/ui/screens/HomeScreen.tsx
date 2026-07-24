@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import {
   Alert,
   Pressable,
@@ -10,6 +9,10 @@ import {
 } from 'react-native';
 
 import { DEVELOPER_CREDIT } from '../../config/appInfo';
+import {
+  invokeHomeContinue,
+  shouldEnableHomeContinue,
+} from '../homeContinue';
 import { gameModeLabel, resolveGameMode } from '../gameMode';
 import { resolveGameStatus } from '../gameLifecycle';
 import { resolveTargetRoundCount } from '../targetRoundCount';
@@ -24,8 +27,8 @@ const home = {
   text: '#263238',
   textMuted: '#6B736C',
   white: '#FFFFFF',
-  card: '#FFFEF9',
-  cardBorder: 'rgba(200, 164, 77, 0.35)',
+  card: '#FFFFFF',
+  cardBorder: 'rgba(200, 164, 77, 0.4)',
   tileFace: '#FFFEF8',
   tileRed: '#C62828',
   tileBlack: '#1A1A1A',
@@ -43,13 +46,81 @@ type HomeScreenProps = {
 };
 
 type MenuCardProps = {
-  icon: ReactNode;
   title: string;
   subtitle: string;
   onPress: () => void;
   disabled?: boolean;
   compact?: boolean;
+  icon: 'play' | 'trophy' | 'plus' | 'stats' | 'info';
+  playStrong?: boolean;
 };
+
+function MenuIcon({
+  icon,
+  playStrong,
+  muted,
+}: {
+  icon: MenuCardProps['icon'];
+  playStrong?: boolean;
+  muted?: boolean;
+}) {
+  if (icon === 'play') {
+    return (
+      <View
+        style={[
+          styles.iconCircle,
+          playStrong && styles.iconCircleStrong,
+          muted && styles.iconCircleMuted,
+        ]}
+        pointerEvents="none"
+      >
+        <Text
+          style={[
+            styles.iconPlay,
+            playStrong && styles.iconPlayStrong,
+            muted && styles.iconMutedColor,
+          ]}
+        >
+          ▶
+        </Text>
+      </View>
+    );
+  }
+
+  if (icon === 'trophy') {
+    return (
+      <View style={styles.iconCircle} pointerEvents="none">
+        <Text style={styles.iconGlyph}>♔</Text>
+      </View>
+    );
+  }
+
+  if (icon === 'plus') {
+    return (
+      <View style={styles.iconCircle} pointerEvents="none">
+        <Text style={styles.iconPlus}>＋</Text>
+      </View>
+    );
+  }
+
+  if (icon === 'stats') {
+    return (
+      <View style={styles.iconCircle} pointerEvents="none">
+        <View style={styles.statsBars}>
+          <View style={[styles.statsBar, styles.statsBarShort]} />
+          <View style={[styles.statsBar, styles.statsBarMid]} />
+          <View style={[styles.statsBar, styles.statsBarTall]} />
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.iconCircle} pointerEvents="none">
+      <Text style={styles.iconInfo}>i</Text>
+    </View>
+  );
+}
 
 function MenuCard({
   icon,
@@ -58,10 +129,13 @@ function MenuCard({
   onPress,
   disabled = false,
   compact = false,
+  playStrong = false,
 }: MenuCardProps) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      accessibilityLabel={title}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
@@ -71,8 +145,10 @@ function MenuCard({
         pressed && !disabled && styles.menuCardPressed,
       ]}
     >
-      <View style={styles.menuIconSlot}>{icon}</View>
-      <View style={styles.menuText}>
+      <View style={styles.menuIconSlot} pointerEvents="none">
+        <MenuIcon icon={icon} playStrong={playStrong} muted={disabled} />
+      </View>
+      <View style={styles.menuText} pointerEvents="none">
         <Text
           style={[styles.menuTitle, disabled && styles.menuTitleDisabled]}
           numberOfLines={1}
@@ -92,7 +168,7 @@ function MenuCard({
 
 function LogoTiles({ compact }: { compact?: boolean }) {
   return (
-    <View style={styles.tileRow}>
+    <View style={styles.tileRow} pointerEvents="none">
       <View style={[styles.tile, compact && styles.tileCompact]}>
         <Text
           style={[
@@ -130,50 +206,6 @@ function LogoTiles({ compact }: { compact?: boolean }) {
   );
 }
 
-function PlayIcon({ strong = false }: { strong?: boolean }) {
-  return (
-    <View style={[styles.iconCircle, strong && styles.iconCircleStrong]}>
-      <Text style={[styles.iconPlay, strong && styles.iconPlayStrong]}>▶</Text>
-    </View>
-  );
-}
-
-function TrophyIcon() {
-  return (
-    <View style={styles.iconCircle}>
-      <Text style={styles.iconGlyph}>♔</Text>
-    </View>
-  );
-}
-
-function PlusIcon() {
-  return (
-    <View style={styles.iconCircle}>
-      <Text style={styles.iconPlus}>＋</Text>
-    </View>
-  );
-}
-
-function StatsIcon() {
-  return (
-    <View style={styles.iconCircle}>
-      <View style={styles.statsBars}>
-        <View style={[styles.statsBar, styles.statsBarShort]} />
-        <View style={[styles.statsBar, styles.statsBarMid]} />
-        <View style={[styles.statsBar, styles.statsBarTall]} />
-      </View>
-    </View>
-  );
-}
-
-function InfoIcon() {
-  return (
-    <View style={styles.iconCircle}>
-      <Text style={styles.iconInfo}>i</Text>
-    </View>
-  );
-}
-
 export function HomeScreen({
   activeGame,
   onContinue,
@@ -187,8 +219,15 @@ export function HomeScreen({
   const { height } = useWindowDimensions();
   const compact = height < 700;
 
+  const canContinue = shouldEnableHomeContinue(activeGame);
+  const continueGame = canContinue ? activeGame : null;
+
+  function handleContinuePress() {
+    invokeHomeContinue(activeGame, onContinue);
+  }
+
   function handleNewGame() {
-    if (!activeGame) {
+    if (!continueGame) {
       onNewGame();
       return;
     }
@@ -225,42 +264,49 @@ export function HomeScreen({
     ]);
   }
 
-  const targetRounds = activeGame
-    ? resolveTargetRoundCount(activeGame.targetRoundCount)
+  const targetRounds = continueGame
+    ? resolveTargetRoundCount(continueGame.targetRoundCount)
     : 0;
-  const playedRounds = activeGame?.rounds.length ?? 0;
-  const modeLabel = activeGame
-    ? gameModeLabel(resolveGameMode(activeGame.gameMode))
+  const playedRounds = continueGame?.rounds.length ?? 0;
+  const modeLabel = continueGame
+    ? gameModeLabel(resolveGameMode(continueGame.gameMode))
     : '';
-  const status = activeGame ? resolveGameStatus(activeGame) : null;
+  const status = continueGame ? resolveGameStatus(continueGame) : null;
   const continueTitle =
     status === 'paused' ? 'Duraklatılmış Oyun' : 'Devam Eden Oyun';
-  const isIndividual = activeGame
-    ? resolveGameMode(activeGame.gameMode) === 'individual'
+  const isIndividual = continueGame
+    ? resolveGameMode(continueGame.gameMode) === 'individual'
     : false;
 
-  const scoreLines = activeGame
+  const scoreLines = continueGame
     ? isIndividual
-      ? activeGame.teams.flatMap((team) =>
+      ? continueGame.teams.flatMap((team) =>
           team.players.map((player) => `${player.name} ${player.totalScore}`),
         )
       : [
-          `${activeGame.teams[0].name} ${activeGame.teams[0].totalScore}`,
-          `${activeGame.teams[1].name} ${activeGame.teams[1].totalScore}`,
+          `${continueGame.teams[0].name} ${continueGame.teams[0].totalScore}`,
+          `${continueGame.teams[1].name} ${continueGame.teams[1].totalScore}`,
         ]
     : [];
 
+  const continueSubtitle = continueGame
+    ? `${modeLabel} · El ${playedRounds}/${targetRounds}`
+    : 'Son oyuna devam et';
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={[styles.hero, compact && styles.heroCompact]}>
-        <View style={styles.feltTextureA} />
-        <View style={styles.feltTextureB} />
+      <View
+        style={[styles.hero, compact && styles.heroCompact]}
+        pointerEvents="box-none"
+      >
+        <View style={styles.feltTextureA} pointerEvents="none" />
+        <View style={styles.feltTextureB} pointerEvents="none" />
 
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Hakkında"
           onPress={onAbout}
-          hitSlop={10}
+          hitSlop={8}
           style={({ pressed }) => [
             styles.settingsButton,
             pressed && styles.pressed,
@@ -269,7 +315,7 @@ export function HomeScreen({
           <Text style={styles.settingsGlyph}>⚙</Text>
         </Pressable>
 
-        <View style={styles.logoBlock}>
+        <View style={styles.logoBlock} pointerEvents="none">
           <LogoTiles compact={compact} />
           <Text style={[styles.logo101, compact && styles.logo101Compact]}>
             101
@@ -282,78 +328,99 @@ export function HomeScreen({
 
       <View style={[styles.sheet, compact && styles.sheetCompact]}>
         <View style={styles.menuList}>
-          {activeGame ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={onContinue}
-              style={({ pressed }) => [
-                styles.menuCard,
-                styles.continueCard,
-                compact && styles.menuCardCompact,
-                pressed && styles.menuCardPressed,
+          {canContinue && continueGame ? (
+            <View
+              style={[
+                styles.continueShell,
+                compact && styles.continueShellCompact,
               ]}
             >
-              <View style={styles.menuIconSlot}>
-                <PlayIcon strong />
-              </View>
-              <View style={styles.menuText}>
-                <Text style={styles.menuTitle}>{continueTitle}</Text>
-                <Text style={styles.menuSubtitle} numberOfLines={1}>
-                  {modeLabel} · El {playedRounds}/{targetRounds}
-                </Text>
-                {status === 'paused' ? (
-                  <Text style={styles.pausedBadge}>Duraklatıldı</Text>
-                ) : null}
-                {scoreLines.map((line) => (
-                  <Text key={line} style={styles.scoreLine} numberOfLines={1}>
-                    {line}
-                  </Text>
-                ))}
-                <View style={styles.continueActions}>
-                  <Pressable onPress={handleRestart} hitSlop={8}>
-                    <Text style={styles.continueLink}>Yeniden Başlat</Text>
-                  </Pressable>
-                  <Text style={styles.continueDot}>·</Text>
-                  <Pressable onPress={handleAbandon} hitSlop={8}>
-                    <Text style={styles.continueLinkMuted}>İptal Et</Text>
-                  </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={continueTitle}
+                accessibilityState={{ disabled: false }}
+                disabled={false}
+                onPress={handleContinuePress}
+                style={({ pressed }) => [
+                  styles.continueMain,
+                  pressed && styles.menuCardPressed,
+                ]}
+              >
+                <View style={styles.menuIconSlot} pointerEvents="none">
+                  <MenuIcon icon="play" playStrong />
                 </View>
+                <View style={styles.menuText} pointerEvents="none">
+                  <Text style={styles.menuTitle}>{continueTitle}</Text>
+                  <Text style={styles.menuSubtitle} numberOfLines={1}>
+                    {continueSubtitle}
+                  </Text>
+                  {status === 'paused' ? (
+                    <Text style={styles.pausedBadge}>Duraklatıldı</Text>
+                  ) : null}
+                  {scoreLines.map((line) => (
+                    <Text key={line} style={styles.scoreLine} numberOfLines={1}>
+                      {line}
+                    </Text>
+                  ))}
+                </View>
+              </Pressable>
+
+              <View style={styles.continueActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Yeniden Başlat"
+                  onPress={handleRestart}
+                  hitSlop={8}
+                  style={({ pressed }) => pressed && styles.pressed}
+                >
+                  <Text style={styles.continueLink}>Yeniden Başlat</Text>
+                </Pressable>
+                <Text style={styles.continueDot}>·</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="İptal Et"
+                  onPress={handleAbandon}
+                  hitSlop={8}
+                  style={({ pressed }) => pressed && styles.pressed}
+                >
+                  <Text style={styles.continueLinkMuted}>İptal Et</Text>
+                </Pressable>
               </View>
-            </Pressable>
+            </View>
           ) : (
             <MenuCard
-              icon={<PlayIcon />}
+              icon="play"
               title="Devam Eden Oyun"
               subtitle="Son oyuna devam et"
-              onPress={onContinue}
+              onPress={handleContinuePress}
               disabled
               compact={compact}
             />
           )}
 
           <MenuCard
-            icon={<TrophyIcon />}
+            icon="trophy"
             title="Turnuvalar ve Geçmiş"
             subtitle="Turnuva geçmişini görüntüle"
             onPress={onTournaments}
             compact={compact}
           />
           <MenuCard
-            icon={<PlusIcon />}
+            icon="plus"
             title="Yeni Oyun"
             subtitle="Yeni bir oyun başlat"
             onPress={handleNewGame}
             compact={compact}
           />
           <MenuCard
-            icon={<StatsIcon />}
+            icon="stats"
             title="İstatistikler"
             subtitle="Oyun ve başarı istatistikleri"
             onPress={onStats}
             compact={compact}
           />
           <MenuCard
-            icon={<InfoIcon />}
+            icon="info"
             title="Hakkında"
             subtitle="Uygulama hakkında"
             onPress={onAbout}
@@ -361,10 +428,7 @@ export function HomeScreen({
           />
         </View>
 
-        <View style={styles.footer}>
-          <Text style={styles.club}>♣</Text>
-          <Text style={styles.credit}>{DEVELOPER_CREDIT}</Text>
-        </View>
+        <Text style={styles.credit}>{DEVELOPER_CREDIT}</Text>
       </View>
     </SafeAreaView>
   );
@@ -376,21 +440,21 @@ const styles = StyleSheet.create({
     backgroundColor: home.felt,
   },
   hero: {
-    height: '30%',
-    minHeight: 168,
-    maxHeight: 230,
+    height: '28%',
+    minHeight: 160,
+    maxHeight: 210,
     backgroundColor: home.felt,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    paddingTop: 8,
-    paddingBottom: 12,
+    paddingTop: 4,
+    paddingBottom: 10,
   },
   heroCompact: {
     height: '24%',
-    minHeight: 140,
-    maxHeight: 168,
-    paddingBottom: 8,
+    minHeight: 132,
+    maxHeight: 160,
+    paddingBottom: 6,
   },
   feltTextureA: {
     position: 'absolute',
@@ -414,8 +478,8 @@ const styles = StyleSheet.create({
   },
   settingsButton: {
     position: 'absolute',
-    top: 6,
-    right: 14,
+    top: 4,
+    right: 12,
     width: 36,
     height: 36,
     alignItems: 'center',
@@ -424,21 +488,21 @@ const styles = StyleSheet.create({
   },
   settingsGlyph: {
     fontSize: 18,
-    color: 'rgba(255,255,255,0.85)',
+    color: 'rgba(255,255,255,0.88)',
   },
   logoBlock: {
     alignItems: 'center',
-    gap: 4,
+    gap: 2,
   },
   tileRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 4,
+    gap: 7,
+    marginBottom: 6,
   },
   tile: {
-    width: 40,
-    height: 52,
-    borderRadius: 6,
+    width: 38,
+    height: 50,
+    borderRadius: 5,
     backgroundColor: home.tileFace,
     borderWidth: 1.5,
     borderColor: home.gold,
@@ -446,17 +510,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tileCompact: {
-    width: 32,
-    height: 42,
+    width: 30,
+    height: 40,
   },
   tileDigit: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
-    lineHeight: 28,
+    lineHeight: 26,
   },
   tileDigitCompact: {
-    fontSize: 20,
-    lineHeight: 24,
+    fontSize: 18,
+    lineHeight: 22,
   },
   tileDigitRed: {
     color: home.tileRed,
@@ -465,40 +529,40 @@ const styles = StyleSheet.create({
     color: home.tileBlack,
   },
   logo101: {
-    fontSize: 64,
+    fontSize: 58,
     fontWeight: '800',
-    lineHeight: 68,
+    lineHeight: 60,
     color: home.gold,
     letterSpacing: 1,
   },
   logo101Compact: {
-    fontSize: 48,
-    lineHeight: 52,
+    fontSize: 44,
+    lineHeight: 46,
   },
   logoYazBoz: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 6,
+    letterSpacing: 5,
     color: home.white,
   },
   logoYazBozCompact: {
-    fontSize: 14,
-    letterSpacing: 4,
+    fontSize: 13,
+    letterSpacing: 3.5,
   },
   sheet: {
     flex: 1,
     backgroundColor: home.cream,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    marginTop: -8,
-    paddingTop: 16,
-    paddingHorizontal: 18,
+    marginTop: -12,
+    paddingTop: 14,
+    paddingHorizontal: 16,
     paddingBottom: 8,
     justifyContent: 'space-between',
   },
   sheetCompact: {
-    paddingTop: 12,
-    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingHorizontal: 12,
   },
   menuList: {
     gap: 8,
@@ -506,7 +570,7 @@ const styles = StyleSheet.create({
   menuCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 64,
+    minHeight: 62,
     paddingVertical: 10,
     paddingHorizontal: 12,
     gap: 12,
@@ -521,21 +585,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 12,
   },
-  continueCard: {
-    alignItems: 'flex-start',
-    minHeight: 64,
-  },
   menuCardPressed: {
     opacity: 0.78,
   },
   menuCardDisabled: {
-    opacity: 0.78,
-    backgroundColor: 'rgba(255,254,249,0.7)',
+    opacity: 0.7,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+  },
+  continueShell: {
+    backgroundColor: home.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: home.cardBorder,
+    overflow: 'hidden',
+  },
+  continueShellCompact: {
+    borderRadius: 12,
+  },
+  continueMain: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 12,
+    minHeight: 62,
   },
   menuIconSlot: {
     width: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingTop: 2,
   },
   menuText: {
     flex: 1,
@@ -575,7 +654,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 4,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+    paddingLeft: 64,
   },
   continueLink: {
     fontSize: 12,
@@ -604,6 +685,9 @@ const styles = StyleSheet.create({
     backgroundColor: home.felt,
     borderColor: home.gold,
   },
+  iconCircleMuted: {
+    opacity: 0.85,
+  },
   iconPlay: {
     fontSize: 12,
     color: home.felt,
@@ -611,6 +695,9 @@ const styles = StyleSheet.create({
   },
   iconPlayStrong: {
     color: home.white,
+  },
+  iconMutedColor: {
+    color: home.textMuted,
   },
   iconGlyph: {
     fontSize: 16,
@@ -648,20 +735,13 @@ const styles = StyleSheet.create({
   statsBarTall: {
     height: 14,
   },
-  footer: {
-    alignItems: 'center',
-    gap: 2,
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
-  club: {
-    fontSize: 14,
-    color: home.gold,
-  },
   credit: {
     fontSize: 10,
     fontWeight: '500',
     color: home.gold,
+    textAlign: 'center',
+    paddingTop: 6,
+    paddingBottom: 2,
   },
   pressed: {
     opacity: 0.75,
