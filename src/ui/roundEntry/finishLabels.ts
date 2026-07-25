@@ -3,8 +3,8 @@ import { RoundEntryFinishType } from './types';
 export const FINISH_TYPE_LABELS: Record<RoundEntryFinishType, string> = {
   normal: 'Normal',
   okey: 'Okey',
-  fromHand: 'Elden',
-  fromHandAndOkey: 'Elden Okey',
+  fromHand: 'Kafadan',
+  fromHandAndOkey: 'Kafadan Okey',
   none: 'Bitmedi',
 };
 

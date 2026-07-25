@@ -11,13 +11,55 @@ import {
 } from '../scoreSheet';
 import { colors, layout, radii } from '../theme';
 
+export type ScoreSheetSurface = {
+  frame: string;
+  header: string;
+  row: string;
+  rowAlt: string;
+  total: string;
+  teamTotals: string;
+  grid: string;
+  text: string;
+  textMuted: string;
+  accent: string;
+  penalty: string;
+};
+
+const defaultSurface: ScoreSheetSurface = {
+  frame: colors.cream,
+  header: colors.creamHeader,
+  row: colors.cream,
+  rowAlt: colors.cream,
+  total: colors.creamTotal,
+  teamTotals: colors.creamCard,
+  grid: colors.line,
+  text: colors.text,
+  textMuted: colors.textMuted,
+  accent: colors.green,
+  penalty: colors.penalty,
+};
+
+/** Aktif oyun paneli — krem/beyaz yok. */
+export const activeMintSurface: ScoreSheetSurface = {
+  frame: '#E8EFEA',
+  header: '#CBDACF',
+  row: '#E8EFEA',
+  rowAlt: '#E2ECE5',
+  total: '#CBDACF',
+  teamTotals: '#C5D6CA',
+  grid: 'rgba(23,67,51,0.16)',
+  text: '#142D25',
+  textMuted: 'rgba(20,45,37,0.55)',
+  accent: '#17513D',
+  penalty: '#D9E6D4',
+};
+
 type ScoreSheetTableProps = {
   model: ScoreSheetModel;
   compact?: boolean;
-  /** Aktif oyun mikro rötuş: gövde satır yüksekliği (+px). */
   bodyRowBoost?: number;
-  /** Başlık ile ilk satır ayrımını güçlendir. */
   emphasizeHeader?: boolean;
+  surface?: ScoreSheetSurface;
 };
 
 function CellText({
@@ -25,14 +67,26 @@ function CellText({
   isTotal,
   isHeader,
   compact,
+  surface,
 }: {
   cell: ScoreSheetCell;
   isTotal?: boolean;
   isHeader?: boolean;
   compact?: boolean;
+  surface: ScoreSheetSurface;
 }) {
   if (cell.kind === 'dash') {
-    return <Text style={[styles.dash, compact && styles.dashCompact]}>—</Text>;
+    return (
+      <Text
+        style={[
+          styles.dash,
+          compact && styles.dashCompact,
+          { color: surface.textMuted },
+        ]}
+      >
+        —
+      </Text>
+    );
   }
   if (cell.kind === 'empty') {
     return <Text style={styles.dash}> </Text>;
@@ -42,11 +96,14 @@ function CellText({
       style={[
         styles.cellValue,
         compact && styles.cellValueCompact,
+        { color: surface.text },
         isHeader && styles.headerCellValue,
         isHeader && compact && styles.headerCellValueCompact,
+        isHeader && { color: surface.text, fontWeight: '800' },
         isTotal && styles.cellTotal,
         isTotal && compact && styles.cellTotalCompact,
-        cell.emphasize && !isTotal && styles.cellEmphasize,
+        isTotal && { color: surface.text, fontWeight: '800' },
+        cell.emphasize && !isTotal && { fontWeight: '800', color: surface.accent },
       ]}
       numberOfLines={1}
       adjustsFontSizeToFit
@@ -62,11 +119,15 @@ function SheetRowView({
   isHeader,
   compact,
   bodyRowBoost = 0,
+  surface,
+  rowIndex = 0,
 }: {
   row: ScoreSheetRow;
   isHeader?: boolean;
   compact?: boolean;
   bodyRowBoost?: number;
+  surface: ScoreSheetSurface;
+  rowIndex?: number;
 }) {
   const isTotal = row.kind === 'total';
   const isPenalty = row.kind === 'penalty';
@@ -76,6 +137,16 @@ function SheetRowView({
         bodyRowBoost
       : undefined;
 
+  const rowBg = isHeader
+    ? surface.header
+    : isTotal
+      ? surface.total
+      : isPenalty
+        ? surface.penalty
+        : rowIndex % 2 === 1
+          ? surface.rowAlt
+          : surface.row;
+
   return (
     <View
       style={[
@@ -84,9 +155,9 @@ function SheetRowView({
         bodyHeight != null && { height: bodyHeight },
         isHeader && styles.headerRow,
         isHeader && compact && styles.headerRowCompact,
-        isPenalty && styles.penaltyRow,
         isTotal && styles.totalRow,
         isTotal && compact && styles.totalRowCompact,
+        { backgroundColor: rowBg, borderBottomColor: surface.grid },
       ]}
     >
       <View
@@ -94,22 +165,27 @@ function SheetRowView({
           styles.labelCell,
           compact && styles.labelCellCompact,
           styles.gridBorder,
+          { borderRightColor: surface.grid, backgroundColor: rowBg },
         ]}
       >
         <Text
           style={[
             styles.labelText,
             compact && styles.labelTextCompact,
+            { color: surface.text },
             isHeader && styles.headerText,
             isTotal && styles.totalLabel,
-            isPenalty && styles.penaltyLabel,
+            isPenalty && { color: surface.accent, fontWeight: '800' },
           ]}
           numberOfLines={1}
         >
           {isTotal ? 'Toplam' : row.label}
         </Text>
         {isPenalty && row.detail ? (
-          <Text style={styles.penaltyDetail} numberOfLines={1}>
+          <Text
+            style={[styles.penaltyDetail, { color: surface.textMuted }]}
+            numberOfLines={1}
+          >
             {row.detail}
           </Text>
         ) : null}
@@ -120,6 +196,7 @@ function SheetRowView({
           style={[
             styles.valueCell,
             styles.gridBorder,
+            { borderRightColor: surface.grid, backgroundColor: rowBg },
             index === row.cells.length - 1 && styles.gridBorderLast,
           ]}
         >
@@ -128,6 +205,7 @@ function SheetRowView({
             isTotal={isTotal}
             isHeader={isHeader}
             compact={compact}
+            surface={surface}
           />
         </View>
       ))}
@@ -140,6 +218,7 @@ export function ScoreSheetTable({
   compact = false,
   bodyRowBoost = 0,
   emphasizeHeader = false,
+  surface = defaultSurface,
 }: ScoreSheetTableProps) {
   const bodyRows = getScoreSheetBodyRows(model);
   const totalRow = getScoreSheetTotalRow(model);
@@ -184,65 +263,112 @@ export function ScoreSheetTable({
     model.teamNames != null;
 
   return (
-    <View style={styles.frame}>
+    <View
+      style={[
+        styles.frame,
+        {
+          backgroundColor: surface.frame,
+          borderColor: surface.grid,
+        },
+      ]}
+    >
       <View
         style={[
           styles.stickyHeader,
-          emphasizeHeader && styles.stickyHeaderEmphasized,
+          { borderBottomColor: surface.grid },
+          emphasizeHeader && {
+            borderBottomWidth: 1,
+            backgroundColor: surface.header,
+          },
         ]}
       >
-        <SheetRowView row={headerRow} isHeader compact={compact} />
+        <SheetRowView
+          row={headerRow}
+          isHeader
+          compact={compact}
+          surface={surface}
+        />
       </View>
 
       <ScrollView
         ref={scrollRef}
-        style={styles.bodyScroll}
-        contentContainerStyle={styles.bodyContent}
+        style={[styles.bodyScroll, { backgroundColor: surface.frame }]}
+        contentContainerStyle={[
+          styles.bodyContent,
+          { backgroundColor: surface.frame },
+        ]}
         showsVerticalScrollIndicator
         keyboardShouldPersistTaps="handled"
         onContentSizeChange={handleContentSizeChange}
       >
         {bodyRows.length === 0 ? (
-          <Text style={styles.empty}>Henüz el yok</Text>
+          <Text style={[styles.empty, { color: surface.textMuted }]}>
+            Henüz el yok
+          </Text>
         ) : (
-          bodyRows.map((row) => (
+          bodyRows.map((row, index) => (
             <SheetRowView
               key={row.id}
               row={row}
               compact={compact}
               bodyRowBoost={bodyRowBoost}
+              surface={surface}
+              rowIndex={index}
             />
           ))
         )}
       </ScrollView>
 
-      <View style={styles.stickyFooter}>
-        {totalRow ? <SheetRowView row={totalRow} compact={compact} /> : null}
+      <View
+        style={[styles.stickyFooter, { borderTopColor: surface.grid }]}
+      >
+        {totalRow ? (
+          <SheetRowView row={totalRow} compact={compact} surface={surface} />
+        ) : null}
 
         {showTeamTotals ? (
-          <View style={[styles.teamTotals, compact && styles.teamTotalsCompact]}>
+          <View
+            style={[
+              styles.teamTotals,
+              compact && styles.teamTotalsCompact,
+              {
+                backgroundColor: surface.teamTotals,
+                borderTopColor: surface.grid,
+              },
+            ]}
+          >
             <View style={styles.teamTotalBox}>
-              <Text style={styles.teamTotalLabel} numberOfLines={1}>
+              <Text
+                style={[styles.teamTotalLabel, { color: surface.accent }]}
+                numberOfLines={1}
+              >
                 {model.teamNames![0]}
               </Text>
               <Text
                 style={[
                   styles.teamTotalScore,
                   compact && styles.teamTotalScoreCompact,
+                  { color: surface.text },
                 ]}
               >
                 {model.teamTotals![0]}
               </Text>
             </View>
-            <View style={styles.teamTotalGold} />
+            <View
+              style={[styles.teamTotalGold, { backgroundColor: surface.grid }]}
+            />
             <View style={styles.teamTotalBox}>
-              <Text style={styles.teamTotalLabel} numberOfLines={1}>
+              <Text
+                style={[styles.teamTotalLabel, { color: surface.accent }]}
+                numberOfLines={1}
+              >
                 {model.teamNames![1]}
               </Text>
               <Text
                 style={[
                   styles.teamTotalScore,
                   compact && styles.teamTotalScoreCompact,
+                  { color: surface.text },
                 ]}
               >
                 {model.teamTotals![1]}
@@ -259,24 +385,15 @@ const styles = StyleSheet.create({
   frame: {
     flex: 1,
     minHeight: 0,
-    backgroundColor: colors.cream,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.goldSoft,
+    borderWidth: 1,
     borderRadius: radii.sm,
     overflow: 'hidden',
   },
   stickyHeader: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.line,
-  },
-  stickyHeaderEmphasized: {
-    borderBottomWidth: 1.5,
-    borderBottomColor: colors.goldSoft,
-    backgroundColor: colors.creamHeader,
+    borderBottomWidth: 1,
   },
   stickyFooter: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.line,
+    borderTopWidth: 1,
   },
   bodyScroll: {
     flex: 1,
@@ -289,26 +406,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'stretch',
     height: layout.tableRowHeight,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.line,
+    borderBottomWidth: 1,
   },
   rowCompact: {
     height: layout.tableRowHeight - 4,
   },
   headerRow: {
     height: layout.tableHeaderHeight,
-    backgroundColor: colors.cream,
     borderBottomWidth: 0,
   },
   headerRowCompact: {
     height: layout.tableHeaderHeight - 2,
   },
-  penaltyRow: {
-    backgroundColor: colors.penalty,
-  },
   totalRow: {
     height: layout.tableTotalHeight,
-    backgroundColor: colors.cream,
     borderBottomWidth: 0,
   },
   totalRowCompact: {
@@ -330,8 +441,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 1,
   },
   gridBorder: {
-    borderRightWidth: StyleSheet.hairlineWidth,
-    borderRightColor: colors.line,
+    borderRightWidth: 1,
   },
   gridBorderLast: {
     borderRightWidth: 0,
@@ -339,7 +449,6 @@ const styles = StyleSheet.create({
   labelText: {
     fontSize: 12,
     fontWeight: '700',
-    color: colors.text,
     textAlign: 'center',
   },
   labelTextCompact: {
@@ -348,30 +457,22 @@ const styles = StyleSheet.create({
   headerText: {
     fontSize: 12,
     fontWeight: '800',
-    color: colors.text,
     textAlign: 'center',
   },
   totalLabel: {
     fontSize: 12,
     fontWeight: '800',
-    color: colors.text,
-  },
-  penaltyLabel: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.green,
   },
   penaltyDetail: {
     fontSize: 7,
     fontWeight: '600',
-    color: colors.textMuted,
     textAlign: 'center',
   },
   cellValue: {
     fontSize: 13,
     fontWeight: '600',
-    color: colors.text,
     textAlign: 'center',
+    fontVariant: ['tabular-nums'],
   },
   cellValueCompact: {
     fontSize: 12,
@@ -379,7 +480,6 @@ const styles = StyleSheet.create({
   headerCellValue: {
     fontSize: 12,
     fontWeight: '800',
-    color: colors.text,
   },
   headerCellValueCompact: {
     fontSize: 11,
@@ -387,18 +487,13 @@ const styles = StyleSheet.create({
   cellTotal: {
     fontSize: 15,
     fontWeight: '900',
-    color: colors.text,
+    fontVariant: ['tabular-nums'],
   },
   cellTotalCompact: {
     fontSize: 14,
   },
-  cellEmphasize: {
-    fontWeight: '800',
-    color: colors.green,
-  },
   dash: {
     fontSize: 13,
-    color: colors.textMuted,
   },
   dashCompact: {
     fontSize: 12,
@@ -406,17 +501,14 @@ const styles = StyleSheet.create({
   empty: {
     fontSize: 13,
     fontWeight: '600',
-    color: colors.textMuted,
     textAlign: 'center',
     paddingVertical: 24,
   },
   teamTotals: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    backgroundColor: colors.cream,
     minHeight: 54,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.line,
+    borderTopWidth: 1,
   },
   teamTotalsCompact: {
     minHeight: 48,
@@ -430,20 +522,18 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   teamTotalGold: {
-    width: StyleSheet.hairlineWidth,
-    backgroundColor: colors.line,
+    width: 1,
   },
   teamTotalLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: colors.green,
     textAlign: 'center',
   },
   teamTotalScore: {
     fontSize: 22,
     fontWeight: '900',
     lineHeight: 26,
-    color: colors.text,
+    fontVariant: ['tabular-nums'],
   },
   teamTotalScoreCompact: {
     fontSize: 20,

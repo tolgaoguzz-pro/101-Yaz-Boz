@@ -1,13 +1,20 @@
 {
   "expo": {
-    "name": "101-Yaz-Boz",
+    "name": "101 Yaz-Boz",
     "slug": "101-Yaz-Boz",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B3A2D"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "com.tolgaoguz.yuzbiryazboz",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
@@ -23,6 +30,11 @@
     },
     "plugins": [
       "expo-sqlite"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "9a6a3296-3541-4021-8870-91485fe427fc"
+      }
+    }
   }
 }

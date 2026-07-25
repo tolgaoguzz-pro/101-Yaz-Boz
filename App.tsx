@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
 import { usePersistedActiveGame } from './src/app/usePersistedActiveGame';
@@ -125,10 +125,10 @@ export default function App() {
 
   if (!ready) {
     return (
-      <>
+      <View style={styles.appRoot}>
         <AppLoadingScreen />
         <StatusBar style="light" />
-      </>
+      </View>
     );
   }
 
@@ -253,7 +253,7 @@ export default function App() {
   }
 
   return (
-    <>
+    <View style={styles.appRoot}>
       {screen === 'home' ? (
         <HomeScreen
           activeGame={continuableGame}
@@ -354,6 +354,14 @@ export default function App() {
             : 'dark'
         }
       />
-    </>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  appRoot: {
+    flex: 1,
+    width: '100%',
+    alignSelf: 'stretch',
+  },
+});

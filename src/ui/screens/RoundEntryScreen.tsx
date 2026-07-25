@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -16,6 +16,12 @@ import {
 
 import { CalculateRoundResult } from '../../engine/calculateRound';
 import { RoundSaveMeta } from '../applyGameUpdates';
+import {
+  NumericKeyboardAccessory,
+  NumericKeyboardAndroidDock,
+  numericTextInputProps,
+  useNumericKeyboard,
+} from '../components/NumericKeyboardAccessory';
 import { resolveGameMode } from '../gameMode';
 import { playersFromActiveGame } from '../gameRoster';
 import {
@@ -45,17 +51,29 @@ import {
 import { resolveTargetRoundCount } from '../targetRoundCount';
 import { ActiveGameData } from './ActiveGameScreen';
 import { RoundPreviewScreen } from './RoundPreviewScreen';
-import { colors as ui, layout, radii } from '../theme';
 
-const ROW_HEIGHT = layout.tableRowHeight;
-const HEADER_ROW_HEIGHT = layout.tableHeaderHeight;
+const palette = {
+  background: '#0B3A2D',
+  dark: '#14533F',
+  panel: '#DCE7DF',
+  panelLight: '#EAF1EC',
+  panelMuted: '#C9D8CF',
+  border: '#B7CBBE',
+  borderStrong: '#AFC5B8',
+  textDark: '#142D25',
+  textGreen: '#174333',
+  textMuted: 'rgba(23,67,51,0.62)',
+  placeholder: 'rgba(20,45,37,0.42)',
+  accent: '#B58A43',
+  white: '#FFFFFF',
+  headerHint: 'rgba(255,255,255,0.62)',
+  cancelBorder: 'rgba(255,255,255,0.55)',
+  errorBg: '#F3D8D4',
+  errorBorder: '#D9A39B',
+  errorText: '#8B2E25',
+} as const;
 
-const FINISH_ROW_1 = FINISH_OPTIONS.filter((o) =>
-  o.value === 'normal' || o.value === 'fromHand' || o.value === 'okey',
-);
-const FINISH_ROW_2 = FINISH_OPTIONS.filter(
-  (o) => o.value === 'fromHandAndOkey' || o.value === 'none',
-);
+type Density = 'normal' | 'compact' | 'ultraCompact';
 
 type RoundEntryScreenProps = {
   game: ActiveGameData;
@@ -67,10 +85,12 @@ function MiniSeg({
   label,
   selected,
   onPress,
+  dense,
 }: {
   label: string;
   selected: boolean;
   onPress: () => void;
+  dense?: boolean;
 }) {
   return (
     <Pressable
@@ -78,6 +98,7 @@ function MiniSeg({
       onPress={onPress}
       style={({ pressed }) => [
         styles.miniSeg,
+        dense && styles.miniSegDense,
         selected && styles.miniSegSelected,
         pressed && styles.pressed,
       ]}
@@ -86,7 +107,7 @@ function MiniSeg({
         style={[styles.miniSegLabel, selected && styles.miniSegLabelSelected]}
         numberOfLines={1}
         adjustsFontSizeToFit
-        minimumFontScale={0.75}
+        minimumFontScale={0.7}
       >
         {label}
       </Text>
@@ -94,102 +115,13 @@ function MiniSeg({
   );
 }
 
-function PlayerEntryRow({
-  playerName,
-  playerForm,
-  mode,
-  onSetOpened,
-  onSetOpenKind,
-  onChangeTiles,
-  onBlurTiles,
-  onFocusTiles,
-}: {
-  playerName: string;
-  playerForm: RoundEntryPlayerForm;
-  mode: ReturnType<typeof getPlayerCardMode>;
-  onSetOpened: (opened: boolean) => void;
-  onSetOpenKind: (kind: 'series' | 'doubles') => void;
-  onChangeTiles: (value: string) => void;
-  onBlurTiles: () => void;
-  onFocusTiles: () => void;
-}) {
-  const opened = playerForm.openType !== 'didNotOpen';
-
-  return (
-    <View style={styles.entryRow}>
-      <View style={[styles.colPlayer, styles.gridCell]}>
-        <Text style={styles.playerName} numberOfLines={1}>
-          {playerName}
-        </Text>
-      </View>
-
-      <View style={[styles.colDurum, styles.gridCell]}>
-        {mode.showOpenedChoice ? (
-          <View style={styles.inlineSeg}>
-            <MiniSeg
-              label="Açtı"
-              selected={opened}
-              onPress={() => onSetOpened(true)}
-            />
-            <MiniSeg
-              label="Açmadı"
-              selected={!opened}
-              onPress={() => onSetOpened(false)}
-            />
-          </View>
-        ) : (
-          <Text style={styles.cellDash}>—</Text>
-        )}
-      </View>
-
-      <View style={[styles.colAcilis, styles.gridCell]}>
-        {mode.showSeriesDoubles ? (
-          <View style={styles.inlineSeg}>
-            <MiniSeg
-              label="Seri"
-              selected={playerForm.openType === 'series'}
-              onPress={() => onSetOpenKind('series')}
-            />
-            <MiniSeg
-              label="Çift"
-              selected={playerForm.openType === 'doubles'}
-              onPress={() => onSetOpenKind('doubles')}
-            />
-          </View>
-        ) : (
-          <Text style={styles.cellDash}>—</Text>
-        )}
-      </View>
-
-      <View style={[styles.colKalan, styles.gridCell, styles.gridCellLast]}>
-        {mode.showRemainingTiles ? (
-          <TextInput
-            keyboardType="number-pad"
-            value={playerForm.remainingTilePointsText}
-            selectTextOnFocus
-            onChangeText={onChangeTiles}
-            onBlur={onBlurTiles}
-            onFocus={onFocusTiles}
-            placeholderTextColor={ui.textMuted}
-            style={styles.tileInput}
-          />
-        ) : (
-          <Text style={styles.cellDash}>—</Text>
-        )}
-      </View>
-    </View>
-  );
-}
-
 function FinisherChip({
   name,
   selected,
-  compact,
   onPress,
 }: {
   name: string;
   selected: boolean;
-  compact: boolean;
   onPress: () => void;
 }) {
   return (
@@ -198,7 +130,6 @@ function FinisherChip({
       onPress={onPress}
       style={({ pressed }) => [
         styles.finisherButton,
-        compact && styles.finisherButtonCompact,
         selected && styles.finisherSelected,
         pressed && styles.pressed,
       ]}
@@ -209,10 +140,48 @@ function FinisherChip({
           selected && styles.finisherLabelSelected,
         ]}
         numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.75}
       >
         {name}
       </Text>
     </Pressable>
+  );
+}
+
+function FormShell({
+  keyboardVisible,
+  scrollRef,
+  density,
+  children,
+}: {
+  keyboardVisible: boolean;
+  scrollRef: RefObject<ScrollView | null>;
+  density: Density;
+  children: ReactNode;
+}) {
+  const contentStyle = [
+    styles.panelBody,
+    density === 'compact' && styles.panelBodyCompact,
+    density === 'ultraCompact' && styles.panelBodyUltra,
+    keyboardVisible && styles.panelBodyKeyboard,
+  ];
+
+  // View↔ScrollView geçişi TextInput'u unmount edip focus/klavye'yi öldürür.
+  // Aynı ScrollView örneğinde kal; kapalıyken kaydırmayı kilitle.
+  return (
+    <ScrollView
+      ref={scrollRef}
+      style={styles.flex}
+      contentContainerStyle={contentStyle}
+      scrollEnabled={keyboardVisible}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      showsVerticalScrollIndicator={false}
+      bounces={false}
+    >
+      {children}
+    </ScrollView>
   );
 }
 
@@ -222,9 +191,12 @@ export function RoundEntryScreen({
   onSaveRound,
 }: RoundEntryScreenProps) {
   const { height, width } = useWindowDimensions();
-  const compact = height < 700 || width < 380;
+  const density: Density =
+    height < 700 ? 'ultraCompact' : height < 800 ? 'compact' : 'normal';
+  const ultra = density === 'ultraCompact';
+  const finishWrap = width < 380;
   const scrollRef = useRef<ScrollView>(null);
-  const tableOffsetRef = useRef(0);
+  const penaltiesOffsetRef = useRef(0);
 
   const rosterPlayers = useMemo(() => playersFromActiveGame(game), [game]);
   const isIndividual = resolveGameMode(game.gameMode) === 'individual';
@@ -238,31 +210,41 @@ export function RoundEntryScreen({
     useState<RoundPreviewState>(CLOSED_ROUND_PREVIEW);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const savingLock = useRef(false);
-
-  useEffect(() => {
-    const showEvent =
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent =
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, () => {
-      setKeyboardVisible(true);
-    });
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      setKeyboardVisible(false);
-    });
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
 
   const finishOptionsDisabled = form.finisherPlayerId === null;
   const visiblePlayerIds = getVisiblePlayerIds(form);
   const showPlayerTable = shouldShowPlayerEntryCards(form);
   const showHandAutoNote =
     form.finisherPlayerId !== null && isHandStyleFinish(form.finishType);
+
+  const numericPlayerIds = useMemo(() => {
+    if (!showPlayerTable) {
+      return [] as string[];
+    }
+    return visiblePlayerIds.filter(
+      (playerId) => getPlayerCardMode(form, playerId).showRemainingTiles,
+    );
+  }, [form, showPlayerTable, visiblePlayerIds]);
+
+  const numberPad = useNumericKeyboard(numericPlayerIds.length);
+  const keyboardVisible = numberPad.keyboardVisible;
+  const focusedPlayerId =
+    numberPad.activeIndex !== null
+      ? (numericPlayerIds[numberPad.activeIndex] ?? null)
+      : null;
+
+  const showOpenRow =
+    showPlayerTable &&
+    visiblePlayerIds.some(
+      (playerId) => getPlayerCardMode(form, playerId).showOpenedChoice,
+    );
+  const showKindRow =
+    showPlayerTable &&
+    visiblePlayerIds.some(
+      (playerId) => getPlayerCardMode(form, playerId).showSeriesDoubles,
+    );
+  const showTilesRow = numericPlayerIds.length > 0;
 
   const team1Players = rosterPlayers.slice(0, 2);
   const team2Players = rosterPlayers.slice(2, 4);
@@ -337,14 +319,13 @@ export function RoundEntryScreen({
     updatePlayer(playerId, { openType });
   }
 
-  function scrollRowIntoView(rowIndex: number) {
-    const y =
-      tableOffsetRef.current + HEADER_ROW_HEIGHT + rowIndex * ROW_HEIGHT - 12;
+  function scrollPenaltiesIntoView(columnIndex: number) {
+    const y = Math.max(0, penaltiesOffsetRef.current - 12 + columnIndex * 2);
     requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({
-        y: Math.max(0, y),
-        animated: true,
-      });
+      scrollRef.current?.scrollTo({ y, animated: true });
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({ y, animated: true });
+      }, 120);
     });
   }
 
@@ -375,21 +356,6 @@ export function RoundEntryScreen({
     );
   }
 
-  function handleDirectSave() {
-    Keyboard.dismiss();
-    if (savingLock.current || saving) {
-      return;
-    }
-    const outcome = computeRoundFromForm(form, game);
-    if (!outcome.ok) {
-      setError(outcome.error);
-      setPreviewState(buildRoundPreviewError(outcome.error));
-      return;
-    }
-    setError(null);
-    commitSave(outcome.result, outcome.meta);
-  }
-
   function handleSaveFromPreview() {
     if (
       !previewState.visible ||
@@ -411,53 +377,49 @@ export function RoundEntryScreen({
     return map;
   }, [rosterPlayers]);
 
-  function renderFinishRow(
-    options: typeof FINISH_OPTIONS,
-    rowKey: string,
-  ) {
-    return (
-      <View key={rowKey} style={styles.finishRow}>
-        {options.map((option, index) => {
-          const isNoneOption = option.value === 'none';
-          const disabled = finishOptionsDisabled
-            ? !isNoneOption
-            : isNoneOption;
-          const selected = form.finishType === option.value;
-          const isLast = index === options.length - 1;
+  function renderFinishOptions(options: typeof FINISH_OPTIONS) {
+    return options.map((option, index) => {
+      const isNoneOption = option.value === 'none';
+      // Bitmedi her zaman seçilebilir; diğerleri bitiren yokken pasif.
+      const disabled = !isNoneOption && finishOptionsDisabled;
+      const selected = form.finishType === option.value;
+      const isLast = index === options.length - 1;
+      const isWideLabel = option.value === 'fromHandAndOkey';
 
-          return (
-            <Pressable
-              key={option.value}
-              accessibilityRole="button"
-              disabled={disabled}
-              onPress={() => onFinishSegmentPress(option.value)}
-              style={({ pressed }) => [
-                styles.finishCell,
-                !isLast && styles.finishCellDivider,
-                selected && styles.finishCellSelected,
-                disabled && styles.finishCellDisabled,
-                pressed && !disabled && styles.pressed,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.finishCellLabel,
-                  compact && styles.finishCellLabelCompact,
-                  selected && styles.finishCellLabelSelected,
-                  disabled && styles.finishCellLabelDisabled,
-                ]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.7}
-              >
-                {option.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-    );
+      return (
+        <Pressable
+          key={option.value}
+          accessibilityRole="button"
+          disabled={disabled}
+          onPress={() => onFinishSegmentPress(option.value)}
+          style={({ pressed }) => [
+            styles.finishCell,
+            isWideLabel && styles.finishCellWide,
+            finishWrap && styles.finishCellWrap,
+            !isLast && !finishWrap && styles.finishCellDivider,
+            selected && styles.finishCellSelected,
+            disabled && styles.finishCellDisabled,
+            pressed && !disabled && styles.pressed,
+          ]}
+        >
+          <Text
+            style={[
+              styles.finishCellLabel,
+              selected && styles.finishCellLabelSelected,
+              disabled && styles.finishCellLabelDisabled,
+            ]}
+            numberOfLines={1}
+            allowFontScaling={false}
+            ellipsizeMode="clip"
+          >
+            {option.label}
+          </Text>
+        </Pressable>
+      );
+    });
   }
+
+  const hideHeaderHint = ultra || keyboardVisible;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -466,9 +428,16 @@ export function RoundEntryScreen({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={0}
       >
-        <View style={[styles.header, compact && styles.headerCompact]}>
+        <View
+          style={[
+            styles.header,
+            density !== 'normal' && styles.headerCompact,
+            ultra && styles.headerUltra,
+          ]}
+        >
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel="Geri"
             onPress={onBack}
             hitSlop={8}
             style={({ pressed }) => [
@@ -476,235 +445,421 @@ export function RoundEntryScreen({
               pressed && styles.pressed,
             ]}
           >
-            <Text style={styles.backLabel}>‹</Text>
+            <View style={styles.backChevron} />
           </Pressable>
           <View style={styles.titleBlock} pointerEvents="none">
             <Text style={styles.title}>Yeni El</Text>
-            <Text style={styles.roundMeta}>
-              {currentRound} / {targetRounds}. El
-            </Text>
+            {!hideHeaderHint ? (
+              <Text style={styles.headerHint}>Bu el için bilgileri girin</Text>
+            ) : null}
           </View>
           <View style={styles.backSpacer} />
         </View>
 
-        <View style={styles.sheet}>
-          <ScrollView
-            ref={scrollRef}
-            style={styles.bodyScroll}
-            contentContainerStyle={[
-              styles.bodyContent,
-              compact && styles.bodyContentCompact,
-              keyboardVisible && styles.bodyContentKeyboard,
-            ]}
-            keyboardShouldPersistTaps="always"
-            keyboardDismissMode="on-drag"
-            showsVerticalScrollIndicator={false}
-            bounces={keyboardVisible}
+        <View
+          style={[
+            styles.panel,
+            density === 'compact' && styles.panelCompact,
+            ultra && styles.panelUltra,
+          ]}
+        >
+          <FormShell
+            keyboardVisible={keyboardVisible}
+            scrollRef={scrollRef}
+            density={density}
           >
-            <Pressable
-              accessible={false}
-              onPress={Keyboard.dismiss}
-              style={[styles.bodyPressable, compact && styles.bodyPressableCompact]}
+            <View
+              style={[
+                styles.formStack,
+                density === 'compact' && styles.formStackCompact,
+                ultra && styles.formStackUltra,
+              ]}
             >
-              {isIndividual ? (
-                <View style={styles.individualGrid}>
-                  {rosterPlayers.map((player) => (
-                    <View key={player.id} style={styles.individualCell}>
-                      <FinisherChip
-                        name={player.name}
-                        selected={form.finisherPlayerId === player.id}
-                        compact={compact}
-                        onPress={() => selectFinisher(player.id)}
-                      />
+              <View>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionTitleSm}>Oyun Bilgileri</Text>
+                  <View style={styles.roundBadge}>
+                    <Text style={styles.roundBadgeText}>
+                      El: {currentRound} / {targetRounds}
+                    </Text>
+                  </View>
+                </View>
+                <View
+                  style={[
+                    styles.vsCard,
+                    density !== 'normal' && styles.vsCardCompact,
+                    ultra && styles.vsCardUltra,
+                  ]}
+                >
+                  {isIndividual ? (
+                    <View style={styles.vsIndividual}>
+                      <Text style={styles.vsTeamName} numberOfLines={1}>
+                        Bireysel Skor
+                      </Text>
+                      <Text style={styles.vsPlayersLine} numberOfLines={1}>
+                        {rosterPlayers
+                          .map((player) => player.name)
+                          .join(' · ')}
+                      </Text>
                     </View>
-                  ))}
+                  ) : (
+                    <View style={styles.vsRow}>
+                      <View style={styles.vsSide}>
+                        <Text style={styles.vsTeamName} numberOfLines={1}>
+                          {game.teams[0].name}
+                        </Text>
+                        <Text style={styles.vsScore}>
+                          {game.teams[0].totalScore}
+                        </Text>
+                      </View>
+                      <View
+                        style={[styles.vsBadge, ultra && styles.vsBadgeUltra]}
+                      >
+                        <Text
+                          style={[
+                            styles.vsBadgeText,
+                            ultra && styles.vsBadgeTextUltra,
+                          ]}
+                        >
+                          VS
+                        </Text>
+                      </View>
+                      <View style={styles.vsSide}>
+                        <Text style={styles.vsTeamName} numberOfLines={1}>
+                          {game.teams[1].name}
+                        </Text>
+                        <Text style={styles.vsScore}>
+                          {game.teams[1].totalScore}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
                 </View>
-              ) : (
-                <View style={styles.teamBlocks}>
-                  <View style={styles.teamBlock}>
-                    <Text style={styles.teamHeading} numberOfLines={1}>
-                      {game.teams[0].name}
-                    </Text>
-                    {team1Players.map((player) => (
-                      <FinisherChip
-                        key={player.id}
-                        name={player.name}
-                        selected={form.finisherPlayerId === player.id}
-                        compact={compact}
-                        onPress={() => selectFinisher(player.id)}
-                      />
-                    ))}
-                  </View>
-                  <View style={styles.teamDivider} />
-                  <View style={styles.teamBlock}>
-                    <Text style={styles.teamHeading} numberOfLines={1}>
-                      {game.teams[1].name}
-                    </Text>
-                    {team2Players.map((player) => (
-                      <FinisherChip
-                        key={player.id}
-                        name={player.name}
-                        selected={form.finisherPlayerId === player.id}
-                        compact={compact}
-                        onPress={() => selectFinisher(player.id)}
-                      />
-                    ))}
-                  </View>
-                </View>
-              )}
-
-              <Text style={styles.sectionTitle}>Bitiş Türü</Text>
-              <View style={styles.finishSegment}>
-                {renderFinishRow(FINISH_ROW_1, 'finish-row-1')}
-                <View style={styles.finishRowDivider} />
-                {renderFinishRow(FINISH_ROW_2, 'finish-row-2')}
               </View>
 
-              {showHandAutoNote ? (
-                <View style={styles.handNote}>
-                  <Text style={styles.handNoteText}>
-                    Diğer oyuncular açmamış sayılacaktır.
-                  </Text>
+              <View style={styles.outcomeBlock}>
+                <Text style={styles.sectionTitleMd}>Elin Sonucu</Text>
+
+                {isIndividual ? (
+                  <View style={styles.finisherGrid}>
+                    {rosterPlayers.map((player) => (
+                      <View key={player.id} style={styles.finisherCell}>
+                        <FinisherChip
+                          name={player.name}
+                          selected={form.finisherPlayerId === player.id}
+                          onPress={() => selectFinisher(player.id)}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={styles.teamBlocks}>
+                    <View style={styles.teamBlock}>
+                      <Text style={styles.teamHeading} numberOfLines={1}>
+                        {game.teams[0].name}
+                      </Text>
+                      {team1Players.map((player) => (
+                        <FinisherChip
+                          key={player.id}
+                          name={player.name}
+                          selected={form.finisherPlayerId === player.id}
+                          onPress={() => selectFinisher(player.id)}
+                        />
+                      ))}
+                    </View>
+                    <View style={styles.teamBlock}>
+                      <Text style={styles.teamHeading} numberOfLines={1}>
+                        {game.teams[1].name}
+                      </Text>
+                      {team2Players.map((player) => (
+                        <FinisherChip
+                          key={player.id}
+                          name={player.name}
+                          selected={form.finisherPlayerId === player.id}
+                          onPress={() => selectFinisher(player.id)}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                <View
+                  style={[
+                    styles.finishSegment,
+                    finishWrap && styles.finishSegmentWrap,
+                  ]}
+                >
+                  {finishWrap ? (
+                    <>
+                      <View style={styles.finishRow}>
+                        {renderFinishOptions(FINISH_OPTIONS.slice(0, 3))}
+                      </View>
+                      <View style={styles.finishRowDivider} />
+                      <View style={styles.finishRow}>
+                        {renderFinishOptions(FINISH_OPTIONS.slice(3))}
+                      </View>
+                    </>
+                  ) : (
+                    <View style={styles.finishRow}>
+                      {renderFinishOptions(FINISH_OPTIONS)}
+                    </View>
+                  )}
                 </View>
-              ) : null}
+
+                {showHandAutoNote ? (
+                  <Text style={styles.tinyHint}>
+                    Diğerleri açmamış sayılır
+                  </Text>
+                ) : null}
+
+                {showOpenRow ? (
+                  <View style={styles.openStatusRow}>
+                    <Text style={styles.openStatusLabel}>Açılış</Text>
+                    <View style={styles.openStatusPlayers}>
+                      {visiblePlayerIds.map((playerId) => {
+                        const playerForm = form.players.find(
+                          (p) => p.playerId === playerId,
+                        );
+                        const mode = getPlayerCardMode(form, playerId);
+                        if (!playerForm || !mode.showOpenedChoice) {
+                          return (
+                            <View key={playerId} style={styles.openPlayerSlot}>
+                              <Text style={styles.cellDash}>—</Text>
+                            </View>
+                          );
+                        }
+                        const opened = playerForm.openType !== 'didNotOpen';
+                        return (
+                          <View key={playerId} style={styles.openPlayerSlot}>
+                            <View style={styles.inlineSeg}>
+                              <MiniSeg
+                                label="Aç"
+                                selected={opened}
+                                dense
+                                onPress={() => setOpened(playerId, true)}
+                              />
+                              <MiniSeg
+                                label="Yok"
+                                selected={!opened}
+                                dense
+                                onPress={() => setOpened(playerId, false)}
+                              />
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ) : null}
+
+                {showOpenRow ? (
+                  <Text style={styles.tinyHint}>Açılmadıysa 202 ceza</Text>
+                ) : null}
+              </View>
 
               {showPlayerTable ? (
                 <View
-                  style={styles.entryTable}
                   onLayout={(event) => {
-                    tableOffsetRef.current = event.nativeEvent.layout.y;
+                    penaltiesOffsetRef.current = event.nativeEvent.layout.y;
                   }}
+                  style={styles.penaltiesBlock}
                 >
-                  <View style={styles.entryHeader}>
-                    <View style={[styles.colPlayer, styles.gridCell]}>
-                      <Text style={styles.headerCell}>Oyuncu</Text>
+                  <Text style={styles.sectionTitleMd}>Oyuncu Cezaları</Text>
+                  <View style={styles.penaltiesPanel}>
+                    <View style={styles.penaltiesRow}>
+                      <View style={styles.rowLabelCell}>
+                        <Text style={styles.rowLabel}>Oyuncu</Text>
+                      </View>
+                      {visiblePlayerIds.map((playerId) => (
+                        <View key={playerId} style={styles.playerCol}>
+                          <Text style={styles.playerColName} numberOfLines={1}>
+                            {nameByPlayerId.get(playerId) ?? '—'}
+                          </Text>
+                        </View>
+                      ))}
                     </View>
-                    <View style={[styles.colDurum, styles.gridCell]}>
-                      <Text style={styles.headerCell}>Durum</Text>
-                    </View>
-                    <View style={[styles.colAcilis, styles.gridCell]}>
-                      <Text style={styles.headerCell}>Açılış</Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.colKalan,
-                        styles.gridCell,
-                        styles.gridCellLast,
-                      ]}
-                    >
-                      <Text style={styles.headerCell}>Kalan</Text>
-                    </View>
+
+                    {showKindRow ? (
+                      <View style={styles.penaltiesRow}>
+                        <View style={styles.rowLabelCell}>
+                          <Text style={styles.rowLabel}>Tür</Text>
+                        </View>
+                        {visiblePlayerIds.map((playerId) => {
+                          const playerForm = form.players.find(
+                            (p) => p.playerId === playerId,
+                          );
+                          const mode = getPlayerCardMode(form, playerId);
+                          if (!playerForm || !mode.showSeriesDoubles) {
+                            return (
+                              <View key={playerId} style={styles.playerCol}>
+                                <Text style={styles.cellDash}>—</Text>
+                              </View>
+                            );
+                          }
+                          return (
+                            <View key={playerId} style={styles.playerCol}>
+                              <View style={styles.inlineSeg}>
+                                <MiniSeg
+                                  label="Seri"
+                                  selected={playerForm.openType === 'series'}
+                                  dense
+                                  onPress={() =>
+                                    setOpenKind(playerId, 'series')
+                                  }
+                                />
+                                <MiniSeg
+                                  label="Çift"
+                                  selected={playerForm.openType === 'doubles'}
+                                  dense
+                                  onPress={() =>
+                                    setOpenKind(playerId, 'doubles')
+                                  }
+                                />
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    ) : null}
+
+                    {showTilesRow ? (
+                      <View style={styles.penaltiesRow}>
+                        <View style={styles.rowLabelCell}>
+                          <Text style={styles.rowLabel}>Kalan</Text>
+                        </View>
+                        {visiblePlayerIds.map((playerId, columnIndex) => {
+                          const playerForm = form.players.find(
+                            (p) => p.playerId === playerId,
+                          );
+                          const mode = getPlayerCardMode(form, playerId);
+                          if (!playerForm || !mode.showRemainingTiles) {
+                            return (
+                              <View key={playerId} style={styles.playerCol}>
+                                <Text style={styles.cellDash}>—</Text>
+                              </View>
+                            );
+                          }
+                          const padIndex = numericPlayerIds.indexOf(playerId);
+                          const padBind =
+                            padIndex >= 0 ? numberPad.bind(padIndex) : null;
+                          const focused = focusedPlayerId === playerId;
+                          return (
+                            <View key={playerId} style={styles.playerCol}>
+                              <TextInput
+                                ref={padBind?.ref}
+                                {...numericTextInputProps}
+                                inputAccessoryViewID={
+                                  padBind?.inputAccessoryViewID
+                                }
+                                value={playerForm.remainingTilePointsText}
+                                onChangeText={(value) =>
+                                  updatePlayer(playerId, {
+                                    remainingTilePointsText: value,
+                                  })
+                                }
+                                onBlur={() => {
+                                  setFormAndNormalize((current) => ({
+                                    ...current,
+                                    players: current.players.map((player) =>
+                                      player.playerId === playerId
+                                        ? {
+                                            ...player,
+                                            remainingTilePointsText: String(
+                                              parseNonNegativeNumber(
+                                                player.remainingTilePointsText,
+                                              ),
+                                            ),
+                                          }
+                                        : player,
+                                    ),
+                                  }));
+                                }}
+                                onFocus={() => {
+                                  padBind?.onFocus();
+                                  if (keyboardVisible) {
+                                    scrollPenaltiesIntoView(columnIndex);
+                                  }
+                                }}
+                                placeholderTextColor={palette.placeholder}
+                                style={[
+                                  styles.tileInput,
+                                  focused && styles.tileInputFocused,
+                                ]}
+                              />
+                            </View>
+                          );
+                        })}
+                      </View>
+                    ) : null}
                   </View>
-                  {visiblePlayerIds.map((playerId, rowIndex) => {
-                    const playerForm = form.players.find(
-                      (p) => p.playerId === playerId,
-                    );
-                    const playerName = nameByPlayerId.get(playerId);
-                    if (!playerForm || !playerName) {
-                      return null;
-                    }
-                    const mode = getPlayerCardMode(form, playerId);
-                    return (
-                      <PlayerEntryRow
-                        key={playerId}
-                        playerName={playerName}
-                        playerForm={playerForm}
-                        mode={mode}
-                        onSetOpened={(opened) => setOpened(playerId, opened)}
-                        onSetOpenKind={(kind) => setOpenKind(playerId, kind)}
-                        onChangeTiles={(value) =>
-                          updatePlayer(playerId, {
-                            remainingTilePointsText: value,
-                          })
-                        }
-                        onBlurTiles={() =>
-                          updatePlayer(playerId, {
-                            remainingTilePointsText: String(
-                              parseNonNegativeNumber(
-                                playerForm.remainingTilePointsText,
-                              ),
-                            ),
-                          })
-                        }
-                        onFocusTiles={() => scrollRowIntoView(rowIndex)}
-                      />
-                    );
-                  })}
                 </View>
               ) : null}
 
-              {error ? <Text style={styles.error}>{error}</Text> : null}
-            </Pressable>
-          </ScrollView>
-
-          {!keyboardVisible ? (
-            <View style={[styles.footer, compact && styles.footerCompact]}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={onBack}
-                disabled={saving}
-                style={({ pressed }) => [
-                  styles.footerButton,
-                  styles.cancelButton,
-                  compact && styles.footerButtonCompact,
-                  pressed && !saving && styles.pressed,
-                ]}
-              >
-                <Text
-                  style={styles.cancelLabel}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.8}
-                >
-                  İptal
+              {error ? (
+                <Text style={styles.error} numberOfLines={2}>
+                  {error}
                 </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={handlePreview}
-                disabled={saving}
-                style={({ pressed }) => [
-                  styles.footerButton,
-                  styles.secondaryButton,
-                  compact && styles.footerButtonCompact,
-                  pressed && !saving && styles.pressed,
-                  saving && styles.disabled,
-                ]}
-              >
-                <Text
-                  style={styles.secondaryLabel}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.8}
-                >
-                  Önizle
-                </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={handleDirectSave}
-                disabled={saving}
-                style={({ pressed }) => [
-                  styles.footerButton,
-                  styles.primaryButton,
-                  compact && styles.footerButtonCompact,
-                  pressed && !saving && styles.pressed,
-                  saving && styles.disabled,
-                ]}
-              >
-                <Text
-                  style={styles.primaryLabel}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.75}
-                >
-                  Eli Kaydet
-                </Text>
-              </Pressable>
+              ) : null}
             </View>
-          ) : null}
+          </FormShell>
         </View>
+
+        {!keyboardVisible ? (
+          <View
+            style={[
+              styles.footer,
+              density !== 'normal' && styles.footerCompact,
+              ultra && styles.footerUltra,
+            ]}
+          >
+            <Pressable
+              accessibilityRole="button"
+              onPress={onBack}
+              disabled={saving}
+              style={({ pressed }) => [
+                styles.cancelButton,
+                ultra && styles.footerButtonUltra,
+                pressed && !saving && styles.pressed,
+                saving && styles.disabled,
+              ]}
+            >
+              <Text style={styles.cancelLabel}>İptal</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={handlePreview}
+              disabled={saving}
+              style={({ pressed }) => [
+                styles.primaryButton,
+                ultra && styles.footerButtonUltra,
+                pressed && !saving && styles.pressed,
+                saving && styles.disabled,
+              ]}
+            >
+              <Text
+                style={styles.primaryLabel}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                {saving ? 'Kaydediliyor…' : 'Önizle ve Kaydet'}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        <NumericKeyboardAndroidDock
+          visible={numberPad.showAndroidDock}
+          keyboardHeight={numberPad.keyboardHeight}
+          canPrev={numberPad.canPrev}
+          canNext={numberPad.canNext}
+          onPrev={numberPad.goPrev}
+          onNext={numberPad.goNext}
+          onDismiss={numberPad.dismiss}
+        />
       </KeyboardAvoidingView>
+
+      <NumericKeyboardAccessory fieldCount={numberPad.fieldCount} />
 
       <Modal
         visible={previewState.visible && previewState.result != null}
@@ -730,377 +885,510 @@ export function RoundEntryScreen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: ui.green,
+    backgroundColor: palette.background,
   },
   flex: {
     flex: 1,
+    minHeight: 0,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingBottom: 6,
-    backgroundColor: ui.green,
-    minHeight: 44,
+    paddingHorizontal: 6,
+    paddingTop: 2,
+    paddingBottom: 8,
+    minHeight: 78,
+    backgroundColor: palette.background,
   },
   headerCompact: {
+    minHeight: 72,
+    paddingBottom: 6,
+  },
+  headerUltra: {
+    minHeight: 56,
     paddingBottom: 4,
-    minHeight: 40,
   },
   backButton: {
     width: 40,
-    height: 36,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
   backSpacer: {
     width: 40,
   },
-  backLabel: {
-    fontSize: 30,
-    fontWeight: '300',
-    color: ui.white,
-    marginTop: -2,
+  backChevron: {
+    width: 11,
+    height: 11,
+    borderLeftWidth: 2.5,
+    borderBottomWidth: 2.5,
+    borderColor: palette.white,
+    transform: [{ rotate: '45deg' }],
+    marginLeft: 4,
   },
   titleBlock: {
     flex: 1,
     alignItems: 'center',
   },
   title: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: ui.white,
+    fontSize: 26,
+    lineHeight: 30,
+    fontWeight: '800',
+    color: palette.white,
   },
-  roundMeta: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: ui.headerMuted,
+  headerHint: {
     marginTop: 1,
+    fontSize: 13,
+    lineHeight: 17,
+    fontWeight: '400',
+    color: palette.headerHint,
+    textAlign: 'center',
   },
-  sheet: {
+  panel: {
     flex: 1,
     minHeight: 0,
-    backgroundColor: ui.cream,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
+    marginHorizontal: 16,
+    backgroundColor: palette.panel,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 24,
     overflow: 'hidden',
   },
-  bodyScroll: {
-    flex: 1,
-    minHeight: 0,
+  panelCompact: {
+    borderRadius: 22,
   },
-  bodyContent: {
+  panelUltra: {
+    borderRadius: 20,
+    marginHorizontal: 12,
+  },
+  panelBody: {
     flexGrow: 1,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 18,
+  },
+  panelBodyCompact: {
     paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 16,
+  },
+  panelBodyUltra: {
+    paddingHorizontal: 10,
     paddingTop: 10,
-    paddingBottom: 10,
+    paddingBottom: 14,
   },
-  bodyContentCompact: {
-    paddingTop: 8,
-    paddingBottom: 8,
+  panelBodyKeyboard: {
+    paddingBottom: 24,
   },
-  bodyContentKeyboard: {
-    paddingBottom: 20,
+  formStack: {
+    flex: 1,
+    gap: 12,
   },
-  bodyPressable: {
+  formStackCompact: {
+    gap: 11,
+  },
+  formStackUltra: {
+    gap: 10,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 8,
   },
-  bodyPressableCompact: {
+  sectionTitleSm: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: palette.textGreen,
+  },
+  sectionTitleMd: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: palette.textGreen,
+  },
+  roundBadge: {
+    backgroundColor: palette.panelMuted,
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  roundBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: palette.textGreen,
+  },
+  vsCard: {
+    height: 92,
+    marginTop: 8,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    backgroundColor: palette.panelMuted,
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
+    justifyContent: 'center',
+  },
+  vsCardCompact: {
+    height: 86,
+  },
+  vsCardUltra: {
+    height: 80,
+    marginTop: 6,
+    paddingHorizontal: 10,
+  },
+  vsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  vsSide: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+  },
+  vsIndividual: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  vsTeamName: {
+    fontSize: 15,
+    lineHeight: 18,
+    fontWeight: '800',
+    color: palette.textGreen,
+    textAlign: 'center',
+  },
+  vsScore: {
+    fontSize: 26,
+    lineHeight: 30,
+    fontWeight: '900',
+    color: palette.dark,
+    fontVariant: ['tabular-nums'],
+  },
+  vsPlayersLine: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: palette.textMuted,
+    textAlign: 'center',
+  },
+  vsBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: palette.dark,
+    borderWidth: 2,
+    borderColor: palette.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vsBadgeUltra: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  vsBadgeText: {
+    fontSize: 19,
+    fontWeight: '800',
+    color: palette.white,
+  },
+  vsBadgeTextUltra: {
+    fontSize: 16,
+  },
+  outcomeBlock: {
     gap: 6,
   },
-  teamBlocks: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-  },
-  teamBlock: {
-    flex: 1,
-    gap: 5,
-    paddingHorizontal: 6,
-  },
-  teamDivider: {
-    width: 1.5,
-    backgroundColor: ui.gold,
-    alignSelf: 'stretch',
-  },
-  teamHeading: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-    color: ui.green,
-    textAlign: 'center',
-    marginBottom: 1,
-  },
-  individualGrid: {
+  finisherGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
   },
-  individualCell: {
+  finisherCell: {
     width: '48%',
     flexGrow: 1,
   },
+  teamBlocks: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  teamBlock: {
+    flex: 1,
+    gap: 6,
+  },
+  teamHeading: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: palette.textGreen,
+    textAlign: 'center',
+  },
   finisherButton: {
-    minHeight: 40,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: ui.green,
-    backgroundColor: ui.white,
+    height: 38,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
+    backgroundColor: palette.panelLight,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
   },
-  finisherButtonCompact: {
-    minHeight: 36,
-  },
   finisherSelected: {
-    backgroundColor: ui.green,
-    borderColor: ui.gold,
+    backgroundColor: palette.dark,
+    borderColor: palette.accent,
   },
   finisherLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: ui.green,
+    color: palette.textGreen,
     textAlign: 'center',
   },
   finisherLabelSelected: {
-    color: ui.white,
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-    color: ui.green,
+    color: palette.white,
   },
   finishSegment: {
-    borderWidth: 1.5,
-    borderColor: ui.gold,
-    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: ui.white,
+    backgroundColor: palette.panelLight,
+  },
+  finishSegmentWrap: {
+    borderRadius: 12,
   },
   finishRow: {
     flexDirection: 'row',
-    minHeight: 36,
+    height: 42,
   },
   finishRowDivider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: ui.goldSoft,
+    backgroundColor: palette.border,
   },
   finishCell: {
     flex: 1,
+    height: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
-    paddingVertical: 7,
-    backgroundColor: ui.white,
+    paddingHorizontal: 2,
+    backgroundColor: palette.panelLight,
+  },
+  finishCellWide: {
+    flex: 1.45,
+  },
+  finishCellWrap: {
+    flexBasis: 0,
   },
   finishCellDivider: {
     borderRightWidth: StyleSheet.hairlineWidth,
-    borderRightColor: ui.goldSoft,
+    borderRightColor: palette.border,
   },
   finishCellSelected: {
-    backgroundColor: ui.green,
+    backgroundColor: palette.dark,
   },
   finishCellDisabled: {
     opacity: 0.38,
   },
   finishCellLabel: {
-    fontSize: 12,
+    fontSize: 13,
+    lineHeight: 16,
     fontWeight: '700',
-    color: ui.green,
+    color: palette.textGreen,
     textAlign: 'center',
-  },
-  finishCellLabelCompact: {
-    fontSize: 11,
   },
   finishCellLabelSelected: {
-    color: ui.white,
+    color: palette.white,
   },
   finishCellLabelDisabled: {
-    color: ui.textMuted,
+    color: palette.textMuted,
   },
-  handNote: {
-    backgroundColor: ui.creamHeader,
-    borderWidth: 1,
-    borderColor: ui.goldSoft,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  handNoteText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: ui.textMuted,
-    textAlign: 'center',
-  },
-  entryTable: {
-    borderWidth: 1.5,
-    borderColor: ui.gold,
-    borderRadius: 6,
-    overflow: 'hidden',
-    backgroundColor: ui.cream,
-  },
-  entryHeader: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    height: HEADER_ROW_HEIGHT,
-    backgroundColor: ui.creamHeader,
-    borderBottomWidth: 1.5,
-    borderBottomColor: ui.gold,
-  },
-  entryRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    height: ROW_HEIGHT,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: ui.line,
-  },
-  gridCell: {
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-    borderRightWidth: StyleSheet.hairlineWidth,
-    borderRightColor: ui.goldSoft,
-  },
-  gridCellLast: {
-    borderRightWidth: 0,
-  },
-  headerCell: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: ui.green,
-    textAlign: 'center',
-  },
-  colPlayer: {
-    width: 64,
-  },
-  colDurum: {
-    flex: 1.35,
-  },
-  colAcilis: {
-    flex: 1.05,
-  },
-  colKalan: {
-    width: 50,
-    alignItems: 'center',
-  },
-  playerName: {
+  tinyHint: {
     fontSize: 11,
+    fontWeight: '400',
+    color: palette.textMuted,
+  },
+  openStatusRow: {
+    height: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  openStatusLabel: {
+    width: 48,
+    fontSize: 13,
     fontWeight: '700',
-    color: ui.text,
+    color: palette.textGreen,
+  },
+  openStatusPlayers: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 6,
+  },
+  openPlayerSlot: {
+    flex: 1,
+    height: 38,
+    justifyContent: 'center',
   },
   inlineSeg: {
+    flex: 1,
     flexDirection: 'row',
-    borderRadius: 6,
+    height: 38,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: ui.green,
+    borderColor: palette.border,
     overflow: 'hidden',
+    backgroundColor: palette.panelLight,
   },
   miniSeg: {
     flex: 1,
-    minHeight: 26,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 2,
-    backgroundColor: ui.white,
+    backgroundColor: palette.panelLight,
+  },
+  miniSegDense: {
+    minHeight: 36,
   },
   miniSegSelected: {
-    backgroundColor: ui.green,
+    backgroundColor: palette.dark,
   },
   miniSegLabel: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
-    color: ui.green,
+    color: palette.textGreen,
   },
   miniSegLabelSelected: {
-    color: ui.white,
+    color: palette.white,
+  },
+  penaltiesBlock: {
+    gap: 10,
+    flexShrink: 1,
+    flexGrow: 1,
+  },
+  penaltiesPanel: {
+    flexGrow: 1,
+    minHeight: 180,
+    backgroundColor: palette.panelMuted,
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingTop: 14,
+    paddingBottom: 14,
+    gap: 10,
+    justifyContent: 'center',
+  },
+  penaltiesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  rowLabelCell: {
+    width: 44,
+  },
+  rowLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: palette.textGreen,
+  },
+  playerCol: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'stretch',
+    justifyContent: 'center',
+  },
+  playerColName: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: palette.textGreen,
+    textAlign: 'center',
   },
   cellDash: {
     fontSize: 12,
-    color: ui.textMuted,
+    color: palette.textMuted,
     textAlign: 'center',
   },
   tileInput: {
-    width: 42,
-    height: layout.inputHeight,
-    borderRadius: 6,
+    width: '100%',
+    minWidth: 64,
+    height: 44,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: ui.border,
-    backgroundColor: ui.white,
-    color: ui.text,
-    fontSize: 13,
+    borderColor: palette.border,
+    backgroundColor: palette.panelLight,
+    color: palette.textDark,
+    fontSize: 17,
     fontWeight: '700',
     textAlign: 'center',
-    paddingHorizontal: 2,
+    paddingHorizontal: 4,
     paddingVertical: 0,
+    zIndex: 10,
+    elevation: 3,
+  },
+  tileInputFocused: {
+    borderColor: palette.accent,
+    borderWidth: 2,
   },
   error: {
     fontSize: 12,
     fontWeight: '600',
-    color: ui.greenDeep,
-    backgroundColor: ui.white,
-    borderRadius: 8,
+    color: palette.errorText,
+    backgroundColor: palette.errorBg,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: ui.gold,
+    borderColor: palette.errorBorder,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 8,
   },
   footer: {
     flexDirection: 'row',
-    backgroundColor: ui.cream,
-    paddingHorizontal: 10,
-    paddingTop: 8,
-    paddingBottom: 8,
-    gap: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: ui.line,
+    alignItems: 'center',
+    backgroundColor: palette.background,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 12,
+    gap: 10,
+    minHeight: 76,
   },
   footerCompact: {
+    minHeight: 72,
+    paddingTop: 8,
+    paddingBottom: 10,
+  },
+  footerUltra: {
+    minHeight: 64,
     paddingTop: 6,
-    paddingBottom: 6,
-    gap: 6,
-  },
-  footerButton: {
-    flex: 1,
-    minHeight: layout.buttonHeight,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  footerButtonCompact: {
-    minHeight: layout.buttonHeightCompact,
-  },
-  primaryButton: {
-    flex: 1.2,
-    backgroundColor: ui.green,
-    borderWidth: 1.5,
-    borderColor: ui.gold,
-  },
-  primaryLabel: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: ui.white,
-  },
-  secondaryButton: {
-    backgroundColor: ui.white,
-    borderWidth: 1.5,
-    borderColor: ui.green,
-  },
-  secondaryLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: ui.green,
+    paddingBottom: 8,
   },
   cancelButton: {
-    backgroundColor: ui.white,
+    width: '34%',
+    height: 54,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: ui.goldSoft,
+    borderColor: palette.cancelBorder,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryButton: {
+    flex: 1,
+    height: 54,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.panel,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  footerButtonUltra: {
+    height: 50,
   },
   cancelLabel: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
-    color: ui.textMuted,
+    color: palette.white,
+  },
+  primaryLabel: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: palette.dark,
   },
   pressed: {
     opacity: 0.82,

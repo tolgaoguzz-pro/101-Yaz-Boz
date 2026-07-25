@@ -1,4 +1,11 @@
-import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import {
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
 import { CalculateRoundResult } from '../../engine/calculateRound';
 import { resolveGameMode } from '../gameMode';
@@ -10,9 +17,35 @@ import { playerIdFromIndividualTeamId } from '../individualRound';
 import { finishTypeLabel } from '../roundEntry/finishLabels';
 import { RoundPreviewMeta } from '../roundEntry/previewState';
 import { ActiveGameData } from './ActiveGameScreen';
-import { colors as ui, layout, radii } from '../theme';
 
 export type { RoundPreviewMeta } from '../roundEntry/previewState';
+
+const palette = {
+  background: '#0B3A2D',
+  dark: '#14533F',
+  panel: '#DCE7DF',
+  panelLight: '#EAF1EC',
+  panelMuted: '#C9D8CF',
+  panelStrong: '#C5D6CA',
+  panelRowAlt: '#E3ECE6',
+  border: '#B7CBBE',
+  borderStrong: '#AFC5B8',
+  textDark: '#142D25',
+  textGreen: '#174333',
+  teamName: '#17613D',
+  teamScore: '#102B22',
+  textMuted: 'rgba(23,67,51,0.58)',
+  rowLine: 'rgba(23,67,51,0.14)',
+  headerMeta: 'rgba(255,255,255,0.68)',
+  cancelBorder: 'rgba(255,255,255,0.55)',
+  accent: '#B58A43',
+  bonusBg: '#E7D9B9',
+  bonusBorder: '#C9AA66',
+  bonusValue: '#72531F',
+  white: '#FFFFFF',
+} as const;
+
+type Density = 'normal' | 'compact' | 'ultraCompact';
 
 type RoundPreviewScreenProps = {
   game: ActiveGameData;
@@ -31,6 +64,12 @@ export function RoundPreviewScreen({
   onBack,
   onSave,
 }: RoundPreviewScreenProps) {
+  const { height } = useWindowDimensions();
+  const density: Density =
+    height < 700 ? 'ultraCompact' : height < 800 ? 'compact' : 'normal';
+  const compact = density !== 'normal';
+  const ultra = density === 'ultraCompact';
+
   const isIndividual = resolveGameMode(game.gameMode) === 'individual';
   const players = playersFromActiveGame(game);
   const nameById = new Map<string, string>(
@@ -52,102 +91,171 @@ export function RoundPreviewScreen({
       ? teamNameFromActiveGame(game, result.finishTeamBonus.teamId)
       : 'Bonus';
 
+  const finishLabel = finishTypeLabel(meta.finishType);
+  const nobodyFinished = meta.finisherPlayerId === null;
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        <Text style={styles.title}>EL ÖNİZLEME</Text>
-        <View style={styles.goldRule} />
-        <Text style={styles.metaLine}>Bitiren Oyuncu: {finisherName}</Text>
-        <Text style={styles.metaLine}>
-          Bitiş Türü: {finishTypeLabel(meta.finishType)}
+      <View
+        style={[
+          styles.header,
+          compact && styles.headerCompact,
+          ultra && styles.headerUltra,
+        ]}
+      >
+        <Text style={[styles.title, compact && styles.titleCompact]}>
+          El Önizleme
         </Text>
+        {!ultra ? (
+          <Text style={styles.metaLine}>
+            {finisherName} · {finishLabel}
+          </Text>
+        ) : null}
+        <View style={styles.headerRule} />
       </View>
 
-      <View style={styles.sheet}>
-        <View style={styles.panel}>
-          <View style={styles.tableHeader}>
-            <Text style={styles.colPlayerHeader}>Oyuncu</Text>
-            <Text style={styles.colScoreHeader}>Puan</Text>
+      <View
+        style={[
+          styles.panel,
+          compact && styles.panelCompact,
+          ultra && styles.panelUltra,
+        ]}
+      >
+        <View style={styles.content}>
+          <View style={[styles.summaryCard, ultra && styles.summaryCardUltra]}>
+            {nobodyFinished ? (
+              <Text style={styles.summarySolo} numberOfLines={1}>
+                {finisherName}
+              </Text>
+            ) : (
+              <View style={styles.summaryRow}>
+                <View style={styles.summarySide}>
+                  <Text style={styles.summaryLabel}>Bitiren</Text>
+                  <Text style={styles.summaryValue} numberOfLines={1}>
+                    {finisherName}
+                  </Text>
+                </View>
+                <View style={styles.summarySide}>
+                  <Text style={styles.summaryLabel}>Bitiş Türü</Text>
+                  <Text style={styles.summaryValue} numberOfLines={1}>
+                    {finishLabel}
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
 
-          {result.players.map((row, index) => (
-            <View
-              key={row.playerId}
-              style={[
-                styles.row,
-                index === result.players.length - 1 &&
-                  (isIndividual || !result.teams.length) &&
-                  !showBonus &&
-                  styles.rowLast,
-              ]}
+          <View style={styles.section}>
+            <Text
+              style={[styles.sectionTitle, compact && styles.sectionTitleCompact]}
             >
-              <Text style={styles.colPlayer} numberOfLines={1}>
-                {nameById.get(row.playerId) ?? row.playerId}
-              </Text>
-              <Text style={styles.colScore}>{row.score}</Text>
+              Oyuncu Puanları
+            </Text>
+            <View style={styles.scoreGrid}>
+              {result.players.map((row, index) => {
+                const isLastPlayer = index === result.players.length - 1;
+                return (
+                  <View
+                    key={row.playerId}
+                    style={[
+                      styles.playerRow,
+                      compact && styles.playerRowCompact,
+                      index % 2 === 1 && styles.playerRowAlt,
+                      isLastPlayer && styles.playerRowLast,
+                    ]}
+                  >
+                    <Text style={styles.playerName} numberOfLines={1}>
+                      {nameById.get(row.playerId) ?? row.playerId}
+                    </Text>
+                    <Text style={styles.playerScore}>{row.score}</Text>
+                  </View>
+                );
+              })}
             </View>
-          ))}
+          </View>
 
           {!isIndividual ? (
-            <>
-              <View style={styles.teamDivider} />
-              {result.teams.map((team, index) => (
-                <View
-                  key={team.teamId}
-                  style={[
-                    styles.row,
-                    index === result.teams.length - 1 &&
-                      !showBonus &&
-                      styles.rowLast,
-                  ]}
-                >
-                  <Text style={styles.teamLabel} numberOfLines={1}>
-                    {teamNameFromActiveGame(game, team.teamId)} Toplamı
-                  </Text>
-                  <Text style={styles.teamScore}>{team.score}</Text>
-                </View>
-              ))}
-            </>
+            <View style={styles.section}>
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  compact && styles.sectionTitleCompact,
+                ]}
+              >
+                Takım Toplamları
+              </Text>
+              <View style={styles.teamsRow}>
+                {result.teams.map((team) => (
+                  <View
+                    key={team.teamId}
+                    style={[
+                      styles.teamCard,
+                      compact && styles.teamCardCompact,
+                    ]}
+                  >
+                    <Text style={styles.teamName} numberOfLines={2}>
+                      {teamNameFromActiveGame(game, team.teamId)}
+                    </Text>
+                    <Text style={styles.teamScore}>{team.score}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
           ) : null}
 
           {showBonus ? (
-            <View style={[styles.bonusRow, styles.rowLast]}>
-              <Text style={styles.bonusLabel} numberOfLines={1}>
-                Bitiş Bonusu · {bonusLabel}
-              </Text>
+            <View style={[styles.bonusCard, ultra && styles.bonusCardUltra]}>
+              <View style={styles.bonusTextCol}>
+                <Text style={styles.bonusTitle}>Bitiş Bonusu</Text>
+                <Text style={styles.bonusSubtitle} numberOfLines={1}>
+                  {bonusLabel}
+                </Text>
+              </View>
               <Text style={styles.bonusValue}>
                 {result.finishTeamBonus.amount}
               </Text>
             </View>
           ) : null}
         </View>
+      </View>
 
-        <View style={styles.footer}>
-          <Pressable
-            accessibilityRole="button"
-            onPress={onSave}
-            disabled={saving}
-            style={({ pressed }) => [
-              styles.primaryButton,
-              pressed && !saving && styles.pressed,
-              saving && styles.disabled,
-            ]}
-          >
-            <Text style={styles.primaryLabel}>ELİ KAYDET</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={onBack}
-            disabled={saving}
-            style={({ pressed }) => [
-              styles.secondaryButton,
-              pressed && !saving && styles.pressed,
-              saving && styles.disabled,
-            ]}
-          >
-            <Text style={styles.secondaryLabel}>GERİ DÖN VE DÜZELT</Text>
-          </Pressable>
-        </View>
+      <View
+        style={[
+          styles.footer,
+          compact && styles.footerCompact,
+          ultra && styles.footerUltra,
+        ]}
+      >
+        <Pressable
+          accessibilityRole="button"
+          onPress={onBack}
+          disabled={saving}
+          style={({ pressed }) => [
+            styles.secondaryButton,
+            compact && styles.footerButtonCompact,
+            pressed && !saving && styles.pressed,
+            saving && styles.disabled,
+          ]}
+        >
+          <Text style={styles.secondaryLabel} numberOfLines={2}>
+            Geri Dön ve Düzelt
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onSave}
+          disabled={saving}
+          style={({ pressed }) => [
+            styles.primaryButton,
+            compact && styles.footerButtonCompact,
+            pressed && !saving && styles.pressed,
+            saving && styles.disabled,
+          ]}
+        >
+          <Text style={styles.primaryLabel} numberOfLines={1}>
+            {saving ? 'Kaydediliyor…' : 'Eli Kaydet'}
+          </Text>
+        </Pressable>
       </View>
     </SafeAreaView>
   );
@@ -156,171 +264,279 @@ export function RoundPreviewScreen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: ui.green,
+    backgroundColor: palette.background,
   },
   header: {
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 14,
+    paddingTop: 8,
+    paddingBottom: 12,
     gap: 4,
   },
+  headerCompact: {
+    paddingBottom: 8,
+  },
+  headerUltra: {
+    paddingTop: 4,
+    paddingBottom: 6,
+  },
   title: {
-    fontSize: 22,
+    fontSize: 30,
     fontWeight: '800',
-    letterSpacing: 1.4,
-    color: ui.gold,
-  },
-  goldRule: {
-    width: 56,
-    height: 2,
-    backgroundColor: ui.gold,
-    borderRadius: 1,
-    marginVertical: 4,
-  },
-  metaLine: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: 'rgba(247, 242, 232, 0.82)',
+    color: palette.white,
     textAlign: 'center',
   },
-  sheet: {
-    flex: 1,
-    backgroundColor: ui.cream,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    paddingHorizontal: 14,
-    paddingTop: 16,
-    paddingBottom: 12,
-    justifyContent: 'space-between',
+  titleCompact: {
+    fontSize: 26,
+  },
+  metaLine: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: palette.headerMeta,
+    textAlign: 'center',
+  },
+  headerRule: {
+    marginTop: 6,
+    width: 48,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.28)',
   },
   panel: {
-    backgroundColor: ui.white,
-    borderRadius: 12,
+    flex: 1,
+    minHeight: 0,
+    marginHorizontal: 16,
+    backgroundColor: palette.panel,
     borderWidth: 1,
-    borderColor: ui.gold,
+    borderColor: palette.border,
+    borderRadius: 28,
+    padding: 18,
     overflow: 'hidden',
   },
-  tableHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 34,
-    paddingHorizontal: 12,
-    backgroundColor: '#EFE8DB',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: ui.line,
+  panelCompact: {
+    padding: 14,
+    borderRadius: 24,
   },
-  colPlayerHeader: {
+  panelUltra: {
+    padding: 12,
+    marginHorizontal: 12,
+    borderRadius: 22,
+  },
+  content: {
     flex: 1,
-    fontSize: 11,
-    fontWeight: '800',
-    color: ui.green,
+    gap: 16,
   },
-  colScoreHeader: {
-    minWidth: 48,
-    textAlign: 'right',
-    fontSize: 11,
-    fontWeight: '800',
-    color: ui.green,
+  summaryCard: {
+    backgroundColor: palette.panelMuted,
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
+    borderRadius: 20,
+    padding: 16,
   },
-  row: {
+  summaryCardUltra: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  summarySide: {
+    flex: 1,
+    gap: 4,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: palette.textMuted,
+  },
+  summaryValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: palette.textGreen,
+  },
+  summarySolo: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: palette.textGreen,
+    textAlign: 'center',
+  },
+  section: {
+    gap: 10,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: palette.textGreen,
+  },
+  sectionTitleCompact: {
+    fontSize: 18,
+  },
+  scoreGrid: {
+    backgroundColor: palette.panelLight,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  playerRow: {
+    minHeight: 58,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 40,
-    paddingHorizontal: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: ui.line,
+    justifyContent: 'space-between',
+    backgroundColor: palette.panelLight,
+    borderBottomWidth: 1,
+    borderBottomColor: palette.rowLine,
   },
-  rowLast: {
+  playerRowCompact: {
+    minHeight: 50,
+    paddingHorizontal: 14,
+  },
+  playerRowAlt: {
+    backgroundColor: palette.panelRowAlt,
+  },
+  playerRowLast: {
     borderBottomWidth: 0,
   },
-  colPlayer: {
+  playerName: {
     flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    color: ui.text,
-  },
-  colScore: {
-    minWidth: 48,
-    textAlign: 'right',
+    marginRight: 12,
     fontSize: 16,
-    fontWeight: '800',
-    color: ui.green,
-  },
-  teamDivider: {
-    height: 1.5,
-    backgroundColor: ui.gold,
-  },
-  teamLabel: {
-    flex: 1,
-    fontSize: 14,
     fontWeight: '700',
-    color: ui.text,
+    color: palette.textGreen,
+  },
+  playerScore: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: palette.textDark,
+    fontVariant: ['tabular-nums'],
+  },
+  teamsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  teamCard: {
+    flex: 1,
+    minHeight: 112,
+    backgroundColor: palette.panelStrong,
+    borderWidth: 1,
+    borderColor: palette.borderStrong,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    gap: 6,
+  },
+  teamCardCompact: {
+    minHeight: 92,
+  },
+  teamName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: palette.teamName,
+    textAlign: 'center',
   },
   teamScore: {
-    minWidth: 48,
-    textAlign: 'right',
-    fontSize: 16,
-    fontWeight: '800',
-    color: ui.green,
+    fontSize: 32,
+    fontWeight: '900',
+    color: palette.teamScore,
+    fontVariant: ['tabular-nums'],
   },
-  bonusRow: {
+  bonusCard: {
+    backgroundColor: palette.bonusBg,
+    borderWidth: 1,
+    borderColor: palette.bonusBorder,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    minHeight: 64,
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 40,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(200, 164, 77, 0.16)',
+    justifyContent: 'space-between',
+    gap: 12,
   },
-  bonusLabel: {
+  bonusCardUltra: {
+    minHeight: 56,
+    paddingHorizontal: 12,
+  },
+  bonusTextCol: {
     flex: 1,
+    gap: 2,
+  },
+  bonusTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: palette.bonusValue,
+  },
+  bonusSubtitle: {
     fontSize: 13,
-    fontWeight: '700',
-    color: ui.gold,
+    fontWeight: '600',
+    color: 'rgba(114,83,31,0.78)',
   },
   bonusValue: {
-    minWidth: 48,
-    textAlign: 'right',
-    fontSize: 15,
-    fontWeight: '800',
-    color: ui.green,
+    fontSize: 22,
+    fontWeight: '900',
+    color: palette.bonusValue,
+    fontVariant: ['tabular-nums'],
   },
   footer: {
-    gap: 8,
-  },
-  primaryButton: {
-    minHeight: layout.buttonHeight,
-    borderRadius: 10,
-    backgroundColor: ui.green,
-    borderWidth: 1,
-    borderColor: ui.gold,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    backgroundColor: palette.background,
   },
-  primaryLabel: {
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    color: ui.white,
+  footerCompact: {
+    paddingTop: 10,
+    paddingBottom: 10,
+  },
+  footerUltra: {
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   secondaryButton: {
-    minHeight: layout.buttonHeight,
-    borderRadius: 10,
-    backgroundColor: ui.white,
+    flex: 0.9,
+    height: 56,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: ui.green,
+    borderColor: palette.cancelBorder,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  primaryButton: {
+    flex: 1.1,
+    height: 56,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.panel,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  footerButtonCompact: {
+    height: 50,
   },
   secondaryLabel: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 0.4,
-    color: ui.green,
+    color: palette.white,
+    textAlign: 'center',
+  },
+  primaryLabel: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: palette.dark,
+    textAlign: 'center',
   },
   pressed: {
     opacity: 0.82,
   },
   disabled: {
-    opacity: 0.45,
+    opacity: 0.55,
   },
 });

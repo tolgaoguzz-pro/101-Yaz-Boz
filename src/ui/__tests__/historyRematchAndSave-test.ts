@@ -126,8 +126,9 @@ describe('createGameFromCompletedRecord', () => {
 });
 
 describe('finish labels', () => {
-  it('uses full Elden Okey label', () => {
-    expect(FINISH_TYPE_LABELS.fromHandAndOkey).toBe('Elden Okey');
+  it('uses Kafadan Okey label', () => {
+    expect(FINISH_TYPE_LABELS.fromHand).toBe('Kafadan');
+    expect(FINISH_TYPE_LABELS.fromHandAndOkey).toBe('Kafadan Okey');
     expect(FINISH_TYPE_LABELS.none).toBe('Bitmedi');
   });
 });

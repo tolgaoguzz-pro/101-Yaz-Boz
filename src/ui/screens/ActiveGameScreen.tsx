@@ -1,5 +1,4 @@
 import {
-  Alert,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -14,29 +13,25 @@ import type { FinishType } from '../../engine/models';
 import type { GameActivityEvent, GameStatus } from '../gameActivity';
 import { resolveGameMode } from '../gameMode';
 import { GameActionsSheet } from '../components/GameActionsSheet';
-import { ScoreSheetTable } from '../components/ScoreSheetTable';
+import {
+  ScoreSheetTable,
+  activeMintSurface,
+} from '../components/ScoreSheetTable';
 import { buildScoreSheet } from '../scoreSheet';
 import { resolveTargetRoundCount } from '../targetRoundCount';
 
-/**
- * Ölçüler: design/aktif-oyun-yaz-boz.png @ 393×852
- * green→cream y=180 (21.1%), VS Ø≈47, Durdur≈75×28 @ y≈115–138,
- * footer buton y≈780–827 (h≈48), padH≈16–20
- */
-const REF_W = 393;
-const REF_H = 852;
-/** VS rozeti ~%20 büyütme. */
-const REF_VS = Math.round(47 * 1.2);
-const REF_BTN_H = 48;
-const REF_PAD_H = 16;
-
-const C = {
-  green: '#1F5E3B',
-  cream: '#F7F2E8',
+const palette = {
+  background: '#0B3A2D',
+  dark: '#14533F',
+  panel: '#DCE7DF',
+  panelLight: '#E8EFEA',
+  border: '#B7CBBE',
+  textGreen: '#17513D',
+  accent: '#B58A43',
   white: '#FFFFFF',
-  gold: '#C8A44D',
-  textMuted: '#6B736C',
-  border: 'rgba(38, 50, 56, 0.28)',
+  teamName: '#174333',
+  playerMuted: 'rgba(23,67,51,0.68)',
+  progress: 'rgba(255,255,255,0.92)',
 } as const;
 
 export type { GameStatus } from '../gameActivity';
@@ -107,47 +102,45 @@ export function ActiveGameScreen({
   onAbandon,
 }: ActiveGameScreenProps) {
   const { height, width } = useWindowDimensions();
-  const scale = Math.min(width / REF_W, height / REF_H);
   const compact = height < 700 || width < 380;
-  const padH = Math.round(REF_PAD_H * scale);
-  const vsSize = Math.round(REF_VS * scale);
-  const btnH = Math.round(REF_BTN_H * scale);
-
   const isIndividual = resolveGameMode(game.gameMode) === 'individual';
   const playedRounds = game.rounds.length;
   const targetRounds = resolveTargetRoundCount(game.targetRoundCount);
   const model = useMemo(() => buildScoreSheet(game), [game]);
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [confirmKind, setConfirmKind] = useState<'finish' | 'abandon' | null>(
+    null,
+  );
 
   function openActions() {
     setActionsOpen(true);
   }
 
-  function confirmFinishEarly() {
-    Alert.alert(
-      'Oyunu bitir',
-      'Oyun planlanan el sayısına ulaşmadan bitirilecek. Devam edilsin mi?',
-      [
-        { text: 'Vazgeç', style: 'cancel' },
-        { text: 'Bitir', style: 'destructive', onPress: onFinishEarly },
-      ],
-    );
-  }
-
-  function confirmAbandon() {
-    Alert.alert(
-      'Oyunu iptal et',
-      'Bu oyun silinir ve sonuç sayılmaz. Emin misin?',
-      [
-        { text: 'Vazgeç', style: 'cancel' },
-        { text: 'İptal Et', style: 'destructive', onPress: onAbandon },
-      ],
-    );
-  }
+  // Native Alert.alert (Dialog) Android'de window dimensions'ı bozuyor;
+  // Bitir/İptal sonrası Home compact görünüyordu. Onay aynı metinlerle
+  // uygulama içi overlay'de (Modal/Alert değil) gösterilir.
+  const showConfirm = !actionsOpen && confirmKind !== null;
+  const confirmCopy =
+    confirmKind === 'finish'
+      ? {
+          title: 'Oyunu bitir',
+          message:
+            'Oyun planlanan el sayısına ulaşmadan bitirilecek. Devam edilsin mi?',
+          confirmLabel: 'Bitir',
+          onConfirm: onFinishEarly,
+        }
+      : confirmKind === 'abandon'
+        ? {
+            title: 'Oyunu iptal et',
+            message: 'Bu oyun silinir ve sonuç sayılmaz. Emin misin?',
+            confirmLabel: 'İptal Et',
+            onConfirm: onAbandon,
+          }
+        : null;
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.greenHeader}>
+      <View style={styles.header}>
         <View style={styles.topBar}>
           <Pressable
             accessibilityRole="button"
@@ -159,7 +152,7 @@ export function ActiveGameScreen({
               pressed && styles.pressed,
             ]}
           >
-            <Text style={styles.backLabel}>‹</Text>
+            <View style={styles.backChevron} />
           </Pressable>
           <Text style={styles.title} pointerEvents="none">
             Aktif Oyun
@@ -174,11 +167,15 @@ export function ActiveGameScreen({
               pressed && styles.pressed,
             ]}
           >
-            <Text style={styles.menuLabel}>⋮</Text>
+            <View style={styles.menuDots}>
+              <View style={styles.menuDot} />
+              <View style={styles.menuDot} />
+              <View style={styles.menuDot} />
+            </View>
           </Pressable>
         </View>
 
-        <View style={[styles.progressRow, { paddingHorizontal: padH }]}>
+        <View style={styles.progressRow}>
           <View style={styles.progressText}>
             <Text style={styles.progressLine}>Hedef El: {targetRounds}</Text>
             <Text style={styles.progressLine}>Oynanan El: {playedRounds}</Text>
@@ -192,21 +189,25 @@ export function ActiveGameScreen({
               pressed && styles.pressed,
             ]}
           >
-            <Text style={styles.durdurLabel}>❚❚  Durdur</Text>
+            <View style={styles.pauseGlyph}>
+              <View style={styles.pauseBar} />
+              <View style={styles.pauseBar} />
+            </View>
+            <Text style={styles.durdurLabel}>Durdur</Text>
           </Pressable>
         </View>
       </View>
 
-      <View style={styles.creamBody}>
+      <View style={styles.panel}>
         {isIndividual ? (
-          <View style={[styles.individualBand, { paddingHorizontal: padH }]}>
-            <Text style={styles.individualTitle}>Bireysel Skor</Text>
-            <Text style={styles.individualPlayers} numberOfLines={2}>
+          <View style={styles.teamBand}>
+            <Text style={styles.teamName}>Bireysel Skor</Text>
+            <Text style={styles.playerNames} numberOfLines={2}>
               {model.playerNames.join(' · ')}
             </Text>
           </View>
         ) : (
-          <View style={[styles.teamBand, { paddingHorizontal: padH }]}>
+          <View style={styles.teamBand}>
             <View style={styles.teamSide}>
               <Text style={styles.teamName} numberOfLines={1}>
                 {game.teams[0].name}
@@ -216,21 +217,8 @@ export function ActiveGameScreen({
                 {game.teams[0].players[1].name}
               </Text>
             </View>
-            <View
-              style={[
-                styles.vsBadge,
-                {
-                  width: vsSize,
-                  height: vsSize,
-                  borderRadius: vsSize / 2,
-                },
-              ]}
-            >
-              <Text
-                style={[styles.vsText, { fontSize: Math.round(15 * scale) }]}
-              >
-                VS
-              </Text>
+            <View style={styles.vsBadge}>
+              <Text style={styles.vsText}>VS</Text>
             </View>
             <View style={styles.teamSide}>
               <Text style={styles.teamName} numberOfLines={1}>
@@ -244,91 +232,128 @@ export function ActiveGameScreen({
           </View>
         )}
 
-        <View
-          style={[
-            styles.tableArea,
-            compact && styles.tableAreaCompact,
-            { paddingHorizontal: padH },
-          ]}
-        >
+        <View style={styles.tableShell}>
           <ScoreSheetTable
             model={model}
             compact={compact}
             bodyRowBoost={3}
             emphasizeHeader
+            surface={activeMintSurface}
           />
-        </View>
-
-        <View
-          style={[
-            styles.footer,
-            { paddingHorizontal: padH, gap: Math.round(10 * scale) },
-          ]}
-        >
-          <Pressable
-            accessibilityRole="button"
-            onPress={onNewRound}
-            style={({ pressed }) => [
-              styles.actionButton,
-              { minHeight: btnH },
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text
-              style={styles.actionLabel}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.8}
-            >
-              + Yeni El
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={onAddPenalty}
-            style={({ pressed }) => [
-              styles.actionButton,
-              { minHeight: btnH },
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text
-              style={styles.actionLabel}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.75}
-            >
-              + Ceza Ekle
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={openActions}
-            style={({ pressed }) => [
-              styles.actionButton,
-              { minHeight: btnH },
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text
-              style={styles.actionLabel}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.8}
-            >
-              ≡ İşlemler
-            </Text>
-          </Pressable>
         </View>
       </View>
 
-      <GameActionsSheet
-        visible={actionsOpen}
-        onClose={() => setActionsOpen(false)}
-        onPause={onPause}
-        onFinishEarly={confirmFinishEarly}
-        onAbandon={confirmAbandon}
-      />
+      <View style={styles.footer}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Yeni el"
+          onPress={onNewRound}
+          style={({ pressed }) => [
+            styles.actionButton,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text
+            style={styles.actionLabel}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
+            Yeni El
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Ceza ekle"
+          onPress={onAddPenalty}
+          style={({ pressed }) => [
+            styles.actionButton,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text
+            style={styles.actionLabel}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
+            Ceza Ekle
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="İşlemler"
+          onPress={openActions}
+          style={({ pressed }) => [
+            styles.actionButton,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text
+            style={styles.actionLabel}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+          >
+            İşlemler
+          </Text>
+        </Pressable>
+      </View>
+
+      {actionsOpen ? (
+        <GameActionsSheet
+          visible
+          onClose={() => setActionsOpen(false)}
+          onPause={onPause}
+          onFinishEarly={() => setConfirmKind('finish')}
+          onAbandon={() => setConfirmKind('abandon')}
+        />
+      ) : null}
+
+      {showConfirm && confirmCopy ? (
+        <View style={styles.confirmRoot} pointerEvents="box-none">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Vazgeç"
+            style={styles.confirmBackdrop}
+            onPress={() => setConfirmKind(null)}
+          />
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>{confirmCopy.title}</Text>
+            <Text style={styles.confirmMessage}>{confirmCopy.message}</Text>
+            <View style={styles.confirmActions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Vazgeç"
+                onPress={() => setConfirmKind(null)}
+                style={({ pressed }) => [
+                  styles.confirmCancelBtn,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.confirmCancelLabel}>Vazgeç</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={confirmCopy.confirmLabel}
+                onPress={() => {
+                  const run = confirmCopy.onConfirm;
+                  setConfirmKind(null);
+                  run();
+                }}
+                style={({ pressed }) => [
+                  styles.confirmDangerBtn,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.confirmDangerLabel}>
+                  {confirmCopy.confirmLabel}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -336,51 +361,129 @@ export function ActiveGameScreen({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: C.green,
+    width: '100%',
+    alignSelf: 'stretch',
+    backgroundColor: palette.background,
   },
-  greenHeader: {
-    backgroundColor: C.green,
-    paddingBottom: 12,
+  confirmRoot: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    zIndex: 20,
+  },
+  confirmBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(4,18,14,0.55)',
+  },
+  confirmCard: {
+    backgroundColor: palette.panel,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: palette.border,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 14,
+    gap: 10,
+  },
+  confirmTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: palette.teamName,
+    textAlign: 'center',
+  },
+  confirmMessage: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: palette.playerMuted,
+    textAlign: 'center',
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 6,
+  },
+  confirmCancelBtn: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.panelLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmCancelLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: palette.textGreen,
+  },
+  confirmDangerBtn: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D8A6A0',
+    backgroundColor: '#F0D7D4',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmDangerLabel: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#8B2E25',
+  },
+  header: {
+    backgroundColor: palette.background,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
   },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 44,
-    paddingHorizontal: 4,
+    minHeight: 52,
   },
   iconButton: {
-    width: 40,
-    height: 36,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
   pressed: {
     opacity: 0.78,
   },
-  backLabel: {
-    fontSize: 30,
-    fontWeight: '300',
-    color: C.white,
-    marginTop: -2,
+  backChevron: {
+    width: 12,
+    height: 12,
+    borderLeftWidth: 2.5,
+    borderBottomWidth: 2.5,
+    borderColor: palette.white,
+    transform: [{ rotate: '45deg' }],
+    marginLeft: 4,
   },
-  menuLabel: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: C.white,
-    lineHeight: 24,
+  menuDots: {
+    height: 18,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  menuDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: palette.white,
   },
   title: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 17,
-    fontWeight: '700',
-    color: C.white,
+    fontSize: 28,
+    fontWeight: '800',
+    color: palette.white,
+    letterSpacing: -0.4,
   },
   progressRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 4,
+    marginTop: 8,
     gap: 12,
   },
   progressText: {
@@ -388,40 +491,62 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   progressLine: {
-    fontSize: 14,
+    fontSize: 17,
+    lineHeight: 26,
     fontWeight: '600',
-    color: C.white,
+    color: palette.progress,
   },
   durdurBtn: {
-    minHeight: 32,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 8,
+    height: 52,
+    minWidth: 112,
+    paddingHorizontal: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.35)',
-    backgroundColor: 'rgba(0,0,0,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  durdurLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: C.white,
-  },
-  creamBody: {
-    flex: 1,
-    minHeight: 0,
-    backgroundColor: C.cream,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    marginTop: -2,
-  },
-  teamBand: {
+    borderColor: 'rgba(255,255,255,0.30)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 18,
-    paddingBottom: 14,
-    gap: 10,
+    justifyContent: 'center',
+    gap: 8,
+  },
+  pauseGlyph: {
+    flexDirection: 'row',
+    gap: 3,
+  },
+  pauseBar: {
+    width: 3,
+    height: 12,
+    borderRadius: 1,
+    backgroundColor: palette.white,
+  },
+  durdurLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: palette.white,
+  },
+  panel: {
+    flex: 1,
+    minHeight: 0,
+    marginHorizontal: 16,
+    backgroundColor: palette.panel,
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 28,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  teamBand: {
+    backgroundColor: palette.panel,
+    paddingTop: 26,
+    paddingBottom: 20,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   teamSide: {
     flex: 1,
@@ -430,75 +555,64 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   teamName: {
-    fontSize: 17,
+    fontSize: 22,
     fontWeight: '800',
-    color: C.green,
+    color: palette.teamName,
     textAlign: 'center',
   },
   playerNames: {
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: '500',
-    color: C.textMuted,
+    color: palette.playerMuted,
     textAlign: 'center',
   },
   vsBadge: {
-    backgroundColor: C.green,
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    backgroundColor: palette.dark,
+    borderWidth: 2,
+    borderColor: palette.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: C.gold,
   },
   vsText: {
+    fontSize: 24,
     fontWeight: '800',
-    color: C.white,
+    color: palette.white,
     letterSpacing: 0.5,
   },
-  individualBand: {
-    alignItems: 'center',
-    paddingTop: 18,
-    paddingBottom: 14,
-    gap: 6,
-  },
-  individualTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: C.green,
-    textAlign: 'center',
-  },
-  individualPlayers: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: C.textMuted,
-    textAlign: 'center',
-  },
-  tableArea: {
+  tableShell: {
     flex: 1,
     minHeight: 0,
-    paddingBottom: 4,
-  },
-  tableAreaCompact: {
-    paddingBottom: 2,
+    backgroundColor: palette.panelLight,
+    marginHorizontal: 10,
+    marginBottom: 10,
+    borderRadius: 18,
+    overflow: 'hidden',
   },
   footer: {
     flexDirection: 'row',
-    backgroundColor: C.cream,
-    paddingTop: 8,
-    paddingBottom: 10,
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 12,
   },
   actionButton: {
     flex: 1,
-    borderRadius: 10,
-    backgroundColor: C.white,
+    height: 74,
+    borderRadius: 18,
+    backgroundColor: palette.panel,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: palette.border,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
   },
   actionLabel: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: '700',
-    color: C.green,
+    color: palette.textGreen,
     textAlign: 'center',
   },
 });
