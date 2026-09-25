@@ -18,6 +18,7 @@ Doğrulama: 24 Eylül 2026. İncelenen sohbetin son bölümü mağaza hazırlı�
 - Gerçek cihaz testinin yapıldığını yalnız ilgili kabul kanıtıyla söyle; checklist'te işaretli/boş satır tek başına bugünkü cihaz veya mağaza durumu değildir.
 
 ## Güncel çalışma akışı
+- Beş sade ilke WORKFLOW.md içindedir: temiz Work görevi, güncel ana dal + kısa checkpoint, hedefli tekrarsız okuma, gerekli minimum preview/test/yetkili deploy/QA ve görev sonunda kısa HANDOFF.
 - HANDOFF.md → WORKFLOW.md → CONVERSATION_CONTEXT.md → repo-map.md.
 - Puanlama, kalıcılık, ekran veya mağaza alanından yalnız ilgili modüle git; saf puanlama/UI ayrımını koru.
 - UI değişikliğini gerçek ekranla, oyun ve kayıt akışını etkiye uygun testle doğrula.

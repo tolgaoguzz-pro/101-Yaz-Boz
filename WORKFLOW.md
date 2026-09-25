@@ -1,33 +1,35 @@
-# Çalışma akışı — Project Context / Token Saver
+# Çalışma akışı — Project Context
 
-1. Her yeni görevde zorunlu başlangıç okuması yalnız HANDOFF.md → WORKFLOW.md → CONVERSATION_CONTEXT.md → repo-map.md sırasıdır (minimum-context-first). Geçerli AGENTS ve güvenlik yönergelerini koru.
-   repo-map.md üzerinden yalnız görevle ilgili modüle git. İlgili ana dosyadan bağlantılı dosyaları gerektiği kadar aç; zinciri görev kapsamıyla sınırla. Tüm repoyu veya tüm context setini gereksiz yere okuma. UI-only görevde backend dosyalarını gereksiz yere açma; backend/iş kuralı görevinde DECISIONS.md ve ARCHITECTURE.md içinden yalnız ihtiyaç duyulan bölümleri oku.
-2. Diğer belgeleri yalnız ihtiyaç halinde ve ilgili bölümü kadar oku: CONTEXT.md → genel proje bağlamı; DECISIONS.md → kalıcı iş kuralı / geçmiş karar; OPEN_TASKS.md → açık iş / son durum; ARCHITECTURE.md → mimari / altyapı / entegrasyon / deploy işi.
-3. [repo-map.md](repo-map.md) üzerinden ilgili modüle git; yalnız o modülün dosyalarını ve geçerli yerel yönergelerini incele. Tüm repo/dosya dökümünü veya eski sohbetleri başlangıç bağlamı olarak yükleme.
-4. Önce salt okunur hedefli inceleme ve Git durum kontrolü yap. Kullanıcının mevcut değişikliklerini koru. Karmaşık işte kısa plan çıkar; kapsam büyüyecekse önce bildir.
-5. Yalnız istenen kapsamı uygula. Belge bir dosyayı tarif etse de dosyanın güncel varlığını ve Git durumunu kontrol et; bu harita yerel, commit edilmemiş yollar da içerir.
-6. İşe uygun doğrulama yap. UI değişirse referansı esas al, uygulamayı çalıştır ve gerçek ekran görüntüsünü karşılaştır; yalnız bulunan farkları düzelt. Dokümantasyon-only işte bağlantı/yol ve diff doğrulaması yeterlidir; production deploy başlatma.
-7. Mevcut production/deploy/güvenlik kurallarını ve alt proje sözleşmelerini aynen koru. Bulunmayan bir yayın politikasını varsayma. Yıkıcı, geri alınamaz, güvenlik açısından hassas, veri kaybı riski taşıyan veya kapsamı değiştiren adım öncesinde onay iste.
-8. Commit istendiğinde yalnız görev dosyalarını açık adlarıyla seç; önceden var olan değişiklikleri commit'e katma. Mevcut repo politikasını uygula; remote yoksa uydurma. Push öncesinde hedef dalı ve gönderilecek commit'leri kontrol et; force push yapma.
-9. Görev sonunda yalnız içeriği gerçekten değişmesi gereken context belgelerini güncelle; HANDOFF.md dahil tüm context belgelerini her görevde otomatik güncelleme. Değişiklik gerekiyorsa HANDOFF kısa kalsın; kapanışı bilinmeyen açık işe “doğrulanacak” de.
-10. Son rapor: ne değişti, doğrulama, kalan sorun/risk, önerilen sonraki adım. Yapılmayan testi yapılmış gösterme.
+## Beş çalışma ilkesi
 
-CONVERSATION_CONTEXT.md yalnız yeni ve kalıcı bir çalışma kuralı, tercih veya yanlış anlaşılma ortaya çıktığında güncellenir; her görev sonunda otomatik yazılmaz. Kısa tutulur, tekrarlar çıkarılır; 300–700 kelimeyi aşmaması hedeflenir.
+1. Her ayrı geliştirme işi yeni, temiz bir Work görevinde başlar.
+2. Güncel ana dal (`main`; proje `master` kullanıyorsa `master`) doğrulanır;
+   `HANDOFF.md`, `WORKFLOW.md`, `CONVERSATION_CONTEXT.md` ve `repo-map.md`
+   içinden kısa checkpoint okunur. Eski uzun sohbet taşınmaz; kullanıcı geçmiş
+   kararları yeniden anlatmaz. Remote yoksa mevcut yerel ana dal esas alınır.
+3. Yalnız ilgili dosya ve bölümler hedefli okunur; gereksiz tekrar yapılmaz.
+4. Gerekiyorsa tek preview, gerekli minimum testler ve mevcut yetki kapsamındaki
+   deploy/QA tamamlanır. Projenin zorunlu güvenlik ve kalite kontrolleri korunur.
+5. Görev bitince kısa `HANDOFF.md`/checkpoint güncellenir.
 
-## LOW-TOKEN çalışma protokolü
+## Project Context ve kapsam
 
-Bu bölüm verimlilik kurallarının tek ayrıntı kaynağıdır; AGENTS.md yalnız buraya yönlendirir. Yukarıdaki başlangıç/context sırası ve proje politikaları geçerlidir. Aynı görevde okunmuş ve değişmemiş belgeleri yeniden okuma.
+`CONTEXT.md` genel bağlam, `DECISIONS.md` kalıcı kararlar, `OPEN_TASKS.md` açık
+çalışmalar, `ARCHITECTURE.md` mimari için gerektiği kadar okunur. Bu belgeler,
+modül haritası ve konuşma tercihleri korunur; yalnız ilgili bilgi değiştiğinde
+güncellenir. Tarihli kayıtlar güncel kabul/yayın kanıtı değildir.
 
-1. **Dar inceleme:** repo-map ve hedef işlev/selector üzerinden ilgili fonksiyon ile yakın çağrı akışını oku. Repo geneli içerik aramasına yalnız hedefli arama sonuç vermezse geç. Büyük dosyayı ikinci kez okumadan önce işlev/selector aramasıyla daralt; büyük blokları tekrar alma.
-2. **Çıktı bütçesi:** Araç metin çıktısında varsayılan hedef yaklaşık 2.000, olağan üst sınır yaklaşık 4.000 token'dır. 10.000+ token isteme; filtrele, böl veya yalnız eksik bölümü al. Kesilmiş çıktıyı daha büyük bütçeyle aynen tekrarlama.
-3. **Tek ve erken preview:** UI işinde mümkün olduğunca mevcut bileşen, stil ve işlevlerden tek etkileşimli preview üret. Sentetik preview ardından ikinci entegrasyon preview'ı varsayılan değildir; ayrı ortam gerçekten gerekirse nedenini belirt. İlk anlamlı etkileşimli preview'ı erken göster; kullanıcı görmeden uzun tarayıcı/DOM turları yapma. Revizyon/onay sonrasında yalnız etkilenen alanı derin doğrula.
-4. **Amaçlı tarayıcı kontrolü:** Her çağrı görünüm, taşma, etkileşim veya hata sorusunu yanıtlasın. Aynı turda rutin olarak tam DOM/a11y ağacı, screenshot ve ölçümün üçünü birden toplama; gerekli kanıtı seç. Gerçek ekran doğrulamasını koru.
-5. **Görsel kapsam:** Web UI için masaüstü, kısa masaüstü ve dar ekran kontrollerini koru; mobilde ilgili cihaz/ekran akışını doğrula. Düzeltme sonrası yalnız etkilenen boyut/akışı tekrarla. Ortak layout değiştiyse ilgili boyutları yeniden doğrula.
-6. **Değişiklik-test eşlemesi:** Geçen testi kapsadığı kod değişmedikçe veya yeni hata/belirsizlik çıkmadıkça tekrarlama. Son adayda zorunlu hedefli kontroller ve projenin CI/kalite kapıları korunur. Docs-only işte diff/format/kapsam doğrulaması yap; gereksiz build/deploy yoktur.
-7. **Ortam uyumluluğu:** Kontrolün işletim sistemi ve araç gereksinimini önce belirle. Linux'a özgü kontrolü Windows'ta sırf denemek için çalıştırıp sahte hata üretme; uygun CI/Linux ortamına bırak ve çalıştırılmayan kontrolün sınırını belirt.
-8. **Tur sayısı:** Bağımsız okuma/aramaları uygun olduğunda grupla. Aynı hata ikinci kez görülürse kör tekrar yerine varsayımı veya yöntemi değiştir. Yaklaşık 30 üst seviye araç çağrısında kısa kontrol yap: neden uzadı, hangi tekrarlar var, aynı kalite daha az turla nasıl tamamlanır? Gereksiz tekrar varsa akışı daralt; bu sayı kaliteyi kesen bir kota değildir.
-9. **Yayın takibi:** Yetkili yayın işinde aynı workflow'u yeniden başlatma; kısa durum sorguları kullan, durum değişmiyorsa bekleme aralığını uzat. Tam logu yalnız başarısız adımın tanısı gerektiğinde al. Docs-only işi yayın işine dönüştürme.
-10. **Kısa çalışma kaydı:** Görev içinde okunan dosya/bölümleri, önemli işlevleri, değişen alanları ve geçen testleri kısa kaydet; her tur yeni belge oluşturma. Kapanışta çağrı/tekrar sayısı ve ilk preview'a kadar geçen süreyi eldeki kanıt ölçüsünde belirt; token/kullanım düşüşünü ölçmeden iddia etme. Sonraki benzer görevleri aynı kapsam ve kaliteyle karşılaştır.
-11. **Öncelik:** LOW-TOKEN güvenlik veya kaliteyi atlama gerekçesi değildir. Mevcut yetkilendirme, veri bütünlüğü, izolasyon, preview ve kullanıcı onayı, production kapsamı, rollback ve bağımsız QA kuralları önceliklidir. Mevcut yüksek riskli işlem onayları ve varsa proje-özel tasarım/yeniden tasarım yayın onayı aynen korunur; başka projeden yeni yayın yetkisi veya onay politikası aktarılmaz. Somut risk ek inceleme/test gerektiriyorsa yap ve nedenini kısaca belirt.
+Kullanıcı değişikliklerini koru; yalnız istenen kapsamı uygula. Karmaşık işte
+kısa plan hazırla. UI değiştiğinde referans ve gerçek ekranla doğrula. Belgeler
+için içerik, yol ve diff kontrolleri yeterlidir; gereksiz build veya deploy yoktur.
+Secret, kişisel veri, büyük log veya eski sohbet dökümünü checkpoint'e ekleme.
+Mevcut proje güvenlik, veri, onay ve yayın kuralları geçerlidir; başka projeden
+yayın yetkisi aktarılmaz. Açık deploy yapmama sınırına uy.
 
-101-Yaz-Boz uygulaması: AGENTS içindeki Expo 57 talimatını ve belgelenmiş Expo ~54 uyuşmazlığını bu protokolle çözmeye veya sürüm yükseltmeye çalışma. Kod/sürüm işi geldiğinde ilgili gerçek yapılandırma ve talimatı hedefli doğrula. Mağaza işinde mevcut başvuru/inceleme durumunu kontrol et; yalnız ilgili puanlama, kayıt, UI veya mağaza akışını test et. Gereksiz build/submit/başvuru tekrarı yok; belge işi mağaza yayın yetkisi değildir. YouTube/video klasörleri kapsam dışıdır.
+## 101-Yaz-Boz proje kuralları
+
+`AGENTS.md` içindeki Expo talimatını ve mevcut sürüm uyuşmazlığı kaydını koru;
+bu belge işi sürüm yükseltmez. İlgili oyun/puanlama/kayıt/UI akışını etkiye uygun
+test et. Mağaza işinde mevcut başvuru ve inceleme durumunu doğrula; gereksiz
+build/submit tekrarı yapma. Belge işi mağaza yayın yetkisi değildir.
+YouTube/video klasörleri kapsam dışıdır. Remote/dal uydurma; force push yapma.

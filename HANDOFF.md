@@ -1,7 +1,16 @@
 # Kısa devir — 2026-09-24
 
-- Her yeni görevde zorunlu başlangıç okuması yalnız HANDOFF.md → WORKFLOW.md → CONVERSATION_CONTEXT.md → repo-map.md sırasıdır (minimum-context-first). Diğer belgeleri yalnız WORKFLOW.md içindeki ihtiyaç koşullarına göre aç.
-- Project Context / Token Saver kuruldu; mevcut AGENTS ve CLAUDE yönlendirmeleri korundu.
+## 25 Eylül 2026 — çalışma düzeni sadeleştirmesi
+
+LOW-TOKEN çıktı bütçesi, çağrı sayımı ve ölçüm zorunlulukları kaldırıldı;
+beş sade ilke WORKFLOW.md dosyasındadır. Project Context ve proje özellikleri
+korundu. Bu görev yalnız belge temizliğidir; production deploy içermez.
+
+Doğrulama: 34 puanlama testi, belge/kapsam kontrolleri ve git diff --check geçti.
+Mağaza build/submit veya production deploy yapılmadı.
+
+- Yeni geliştirme işi temiz Work görevinde, güncel ana dal ve ilgili kısa repo checkpoint ile başlar; beş sade ilke WORKFLOW.md dosyasındadır.
+- Project Context kuruldu; mevcut AGENTS ve CLAUDE yönlendirmeleri korundu.
 - SQLite/turnuva kodu mevcut; eski v2 belgesindeki “kod yok” ifadesini güncel durum sayma.
 - AGENTS Expo 57 / package Expo ~54 çelişkisi ve eski checklist kapanışları doğrulanacak.
 - Yerel ağaç kirli; bazı harita yolları izlenmiyor. Önceki değişiklikleri commit'e katma.
